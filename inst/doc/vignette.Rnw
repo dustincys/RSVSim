@@ -1,0 +1,369 @@
+%\VignetteIndexEntry{RSVSim: an R/Bioconductor package for the simulation of structural variations}
+%\VignettePackage{RSVSim}
+
+\documentclass[10pt]{article}
+
+\usepackage{times}
+\usepackage{hyperref}
+
+\textwidth=6.2in
+\textheight=8.5in
+\oddsidemargin=.1in
+\evensidemargin=.1in
+\headheight=-.3in
+
+\newcommand{\Rfunction}[1]{{\texttt{#1}}}
+\newcommand{\Robject}[1]{{\texttt{#1}}}
+\newcommand{\Rpackage}[1]{{\textit{#1}}}
+\newcommand{\Rmethod}[1]{{\texttt{#1}}}
+\newcommand{\Rfunarg}[1]{{\texttt{#1}}}
+\newcommand{\Rclass}[1]{{\textit{#1}}}
+\newcommand{\Rcode}[1]{{\texttt{#1}}}
+
+\SweaveOpts{prefix.string=RSVSim}
+
+\begin{document}
+
+\title{RSVSim \\ an R/Bioconductor package for the simulation of structural variations}
+\author{Christoph Bartenhagen}
+\date{\today}
+
+\maketitle
+
+\tableofcontents
+
+<<echo=FALSE>>=
+options(width=90)
+options(continue=" ")
+@
+
+
+\section{Introduction}
+The simulation of structural variations (SV) is an important measure to assess the performance of algorithms dealing with SVs and their detection and can help with the design of sequencing experiments. A simulation generates a base exact ground truth, which can be used to test the sensitivity and precision of SV callers. \\
+A FASTA-file with the simulated, rearranged genome can be used by common, published read simulators (like \cite{art}), \cite{pirs}) to generate NGS datasets from various platforms that can then be used to asses an SV algorithm . A typical workflow consists of
+\begin{center}
+  SV simulation $\Rightarrow$ (Paired-End) Read simulation $\Rightarrow$ SV algorithm $\Rightarrow$ Evaluation\\
+\end{center}
+Varying parameters of the SV simulation like SV type, size or location and of the read simulator like number of reads (coverage), insert-size (for paired-end) or read length can give helpful information for future sequencing experiment designs. \\
+
+This package addresses the very first step of SV simulation and provides the following features: \\
+\begin{itemize}
+  \item Simulation of deletions, insertions, inversions, tandem duplications and translocations (balanced and unbalanced) of various sizes
+  \item Rearrangement of the human genome (hg19) by default or any other kind of genome available as FASTA file or \Rpackage{BSgenome} package
+  \item Random, non-overlapping placement of SVs with the whole genome or only a subset (e.g. coding, non-coding or low-complexity regions)
+  \item Implementation of, e.g. previously detected or known, SVs at user-supplied coordinates
+  \item Estimation of SV size distribution from real datasets
+  \item Comparison of SV simulation with results from SV detection algorithms
+\end{itemize}
+
+\subsection{Loading the package}
+After installation, the package can be loaded into R by typing 
+<<preliminaries>>=
+library(RSVSim)
+@
+into the R console. \\
+\Rpackage{RSVSim} requires the R-packages \Rpackage{Biostrings}, \Rpackage{IRanges}, \Rpackage{GenomicRanges} and \Rpackage{ShortRead}. Mainly for efficient and convenient storing and access of sequences and genomic coordinates. The packages \Rpackage{BSgenome.Hsapiens.UCSC.hg19}, \Rpackage{GenomicFeatures} and \Rpackage{MASS} are suggested for certain functionalities.
+
+\section{Structural variation simulation}
+The main function for simulation is called \Rpackage{simulateSV}. The simulation works pretty similar for every different SV type by specifying number and size of the variation(s) and (optionally) the regions, where to place the variation (randomly or not). The size can be either one value for every SV type or a vector of values for every single SV. \\
+The following sections give a short example for every SV type using a simple toy example with two chromosomes of 40bp each:
+<<label=toyExample, eval=TRUE>>=
+genome = DNAStringSet(
+c("AAAAAAAAAAAAAAAAAAAATTTTTTTTTTTTTTTTTTTT", 
+"GGGGGGGGGGGGGGGGGGGGCCCCCCCCCCCCCCCCCCCC"))
+names(genome) = c("chr1","chr2")
+genome
+@
+The genome has to be a named \Robject{DNAStringSet} or a filename that points to a FASTA-file saved somewhere on disk. By default, when omitting the genome parameter, \Rfunction{simulateSV} will load the human genome (hg19) automatically. This requires an installation of the R-package \Rpackage{BSgenome.Hsapiens.UCSC.hg19}. \\
+Each implemented SV will be reported with its position in the "normal" reference genome, and the breakpoint sequences. The rearranged genome is returned as \Robject{DNAStringSet} and the SV information is stored in its \Rcode{metadata} slot as a named \Robject{list} of \Rcode{data.frames}. All this can also be written to disk by specifying an \Rfunarg{output} directory (which is the current directory by default). The SV tables are saved as CSV files (called deletions.csv, insertions.csv etc.) and the genome in FASTA format (genome\_rearranged.fasta). \\
+
+Note, that the seeds for the randomizations in the following examples were set for demonstration purposes only. The \Rfunarg{seed} parameter can be omitted or used to reproduce the same simulation several times. \\
+The parameter \Rfunarg{output} is set to \Rcode{NA} in all examples to avoid wrtiting the output to disc.
+
+\subsection{Deletions}
+A segment is cut out from the genome. The following example generates three deletions of 10bp each:
+
+<<label=deletionExample, eval=TRUE>>=
+sim = simulateSV(output=NA, genome=genome, dels=3, sizeDels=10, bpSeqSize=6, seed=246)
+sim
+metadata(sim)
+@
+Chromosome 2, which harbours two deletions, is now 10bp shorter than chromosome 1. The breakpoint sequence of 6bp shows the 3bp up- and downstream of the deletion breakpoint in the rearranged genome.
+
+\subsection{Insertions}
+A segment is cut or copied from one chromosome A and inserted into another chromosome B. The following example generates three insertions of 5bp each:
+<<label=insertionExample, eval=TRUE>>=
+sim = simulateSV(output=NA, genome=genome, ins=3, sizeIns=5, bpSeqSize=6, seed=246)
+sim
+metadata(sim)
+@
+Regarding insertion\_3, for example, the 5bp segment \Rcode{AAAAA} has been removed from chr1:12-16 and inserted into chr2:2-6. There are three breakpoint sequences reported for each insertion: the sequence at the deletion on chrA and at the 5' and 3' end of its insertion on chrB. \\
+
+Setting the parameter \Rfunarg{percCopiedIns} (range: 0-1, i.e. 0\%-100\%) can change the amount of "copy-and-paste-like" insertions. \\
+The same example as before, with the difference that two of the three inserted sequences are copied: 
+<<label=insertionExample, eval=TRUE>>=
+sim = simulateSV(output=NA, genome=genome, ins=3, sizeIns=5, percCopiedIns=0.66, 
+bpSeqSize=6, seed=246)
+sim
+metadata(sim)
+@
+The same sequence \Rcode{AAAAA} from insertion\_3 is now duplicated before insertion into chr2:2-6. Here, no breakpoint sequence is reported for the region on chr1, since this chromosome is not altered.
+
+\subsection{Inversions}
+A segment is cut from one chromosome and its reverse complement is inserted at the same place without loss or a shift of sequence. The example below assigns a different size for each inversion:
+<<label=inversionExample, eval=TRUE>>=
+sim = simulateSV(output=NA, genome=genome, invs=3, sizeInvs=c(2,4,6), bpSeqSize=6, seed=246)
+sim
+metadata(sim)
+@
+Inversions have two breakpoint sequences, one for the 5' end and one for the 3' end of the inverted segment.
+
+\subsection{Tandem duplications}
+A segment is duplicated one after the other. The number of duplications is determined randomly. The parameter \Rfunarg{maxDups} sets the maximum. The following example generates an, at most, tenfold tandem duplication of a 6bp sequence:
+<<label=tandemDupExample, eval=TRUE>>=
+sim = simulateSV(output=NA, genome=genome, dups=1, sizeDups=6, maxDups=10, bpSeqSize=6, seed=800)
+sim
+metadata(sim)
+@
+Here, the breakpoint sequence is the sequence at the end of one duplicated segment and the start of the following one. In this example the duplicated sequence is \Rcode{AAAATT} and it has been repeated three times.
+
+\subsection{Translocations}
+A segment from the 5' or 3' end of one chromosome A is exchanged with the 5' or 3' end of another chromosome B. If it is not balanced, the segment from chromosome B will be lost, what results in a duplicated sequence from chromosome A. The parameter \Rfunarg{percBalancedTrans} sets the amount of balanced translocation (0-1, i.e. 0\%-100\%); by default, all translocations will be balanced. Segments which are translocated between two different ends (5'$\leftrightarrow$'3' of 3'$\leftrightarrow$5') are always inverted. After random generation of the breakpoint, the translocation spans the chromosome until the closest of both ends (which may include the centromere in the human genome). Random nucleotides can be added to each breakpoint by setting the parameter \Rfunarg{transInsert} (which is 0 by default).
+<<label=translocationExample1, eval=TRUE>>=
+sim = simulateSV(output=NA, genome=genome,trans=1, bpSeqSize=6, seed=468)
+sim
+metadata(sim)
+@
+This example exchanges the last 13bp of chromosome 1 with the first 16bp of chromosome 2. Both sequences were inverted.\\
+
+The same example in an unbalanced fashion:
+<<label=translocationExample1, eval=TRUE>>=
+sim = simulateSV(output=NA, genome=genome,trans=1, percBalancedTrans=0, bpSeqSize=6, seed=468)
+sim
+metadata(sim)
+@
+The sequence from chr2:1-16 is lost, while there are now two copies of the translocated segment from chr1:28-40. The breakpoint sequence for chr1 (denoted by chrA in general) is not reported, since this chromosome is not altered. \\
+
+Setting \Rfunarg{transInsert} to a value $>0$ leads to an insert of \Rcode{AT} at the breakpoint on chr1 and and inserted \Rcode{C} on chr2:
+<<label=translocationExample2, eval=TRUE>>=
+sim = simulateSV(output=NA, genome=genome,trans=1, transInsert=4, bpSeqSize=6, seed=468)
+sim
+metadata(sim)
+@
+
+
+\section{Simulation within a genome subset}
+It is possible to run the simulation to certain chromosomes only by specifying the chromosome names in the parameter \Rfunarg{chrs}. It has to be taken care that these chromosome names match the names in the \Robject{DNAStringSet} containing the genome sequences. \\
+Furthermore, every SV has it's own parameter to restrict the simulation to a desired set of genomic regions: \Rfunarg{regionsDels}, \Rfunarg{regionsIns}, \Rfunarg{regionsInvs}, \Rfunarg{regionsDups} and \Rfunarg{regionsTrans}. Each one being a \Robject{GRanges} object with a chromosome name, start- and end-position. \\
+The following example places randomly four inversions into the second half of chr1 and the first half of chr2:
+<<label=regionsExample1, eval=TRUE>>=
+regions = GRanges(IRanges(c(21,1),c(40,20)), seqnames=c("chr1","chr2"))
+regions
+sim = simulateSV(output=NA, genome=genome, invs=4, sizeInvs=5, 
+regionsInvs=regions, bpSeqSize=6, seed=2468)
+sim
+metadata(sim)
+@
+For translocations, the regions only say where to place the breakpoint, since the translocated region spans the chromosome until the closest of both ends. \\
+
+Some applications may focus on certain parts of the hg19 only, like exons, introns or transcripts. The package \Rpackage{GenomicFeatures} provides functionalities to export such coordinates from the UCSC Genome Browser to R (see for example \Rfunction{makeTranscriptDbFromUCSC}, \Rfunction{exonsBy}, \Rfunction{intronsBy}, \Rfunction{transcriptsBy}). In the following example, 100 deletions would be placed somewhere in the exonic regions on hg19:
+<<label=regionsExample2, eval=FALSE>>=
+transcriptDB = makeTranscriptDbFromUCSC(genome = "hg19",tablename = "knownGene")
+exons = exonsBy(transcriptDB)
+exons = unlist(exons)
+exons = GRanges(IRanges(start=start(exons), end=end(exons)), seqnames=seqnames(exons))
+simulateSV(output=NA, dels=100, regionsDels=exons, sizeDels=1000, bpSeqSize=50)
+@
+
+SVs will not be placed within unknown regions or assembly gaps denoted by the letter \Rcode{N}. Such regions are detected and filtered automatically.
+
+\subsection{Inserting a set of SVs}
+The simulation allows to turn off the random generation of breakpoints and to insert a set of (for example previously detected or known) SVs. It works by using the same regions parameters and setting the parameter \Rfunarg{random} to \Rcode{FALSE}. This may also be a vector of five \Rcode{TRUE}/\Rcode{FALSE} values (in the order: deletions, insertions, inversions, tandem duplications, translocations) if some SVs shall be generated randomly and others not. \\
+The example below inserts a deletion at chr2:16-25:
+<<label=regionsExample3, eval=TRUE>>=
+knownDeletion = GRanges(IRanges(16,25), seqnames="chr2")
+names(knownDeletion) = "myDeletion"
+knownDeletion
+sim = simulateSV(output=NA, genome=genome, regionsDels=knownDeletion, bpSeqSize=10, random=FALSE)
+sim
+metadata(sim)
+@
+Note, that the output adopts the names, that were given the \Robject{GRanges} object of the inserted SV(s). \\
+
+It's a little different for insertions and translocations, since they involve two genomic regions. Thus, the \Robject{GRanges} object for \Rfunarg{regionsIns} has to be extended by columns \Rcode{chrB} and \Rcode{startB}, saying, that the sequence within ranges of the \Robject{GRanges} object will be inserted at chrB:startB. \\
+The next example inserts the sequence from chr1:16:25 at chr2:26:
+<<label=regionsExample4, eval=TRUE>>=
+knownInsertion = GRanges(IRanges(16,25),seqnames="chr1", chrB="chr2", startB=26)
+names(knownInsertion) = "myInsertion"
+knownInsertion
+sim = simulateSV(output=NA, genome=genome, regionsIns=knownInsertion, bpSeqSize=10, random=FALSE)
+sim
+metadata(sim)
+@
+The \Robject{GRanges} object for translocations has to be extended by columns \Rcode{chrB}, \Rcode{startB} and \Rcode{endB}, saying, the sequence within the ranges of the object will be exchanged with the sequence from chrB:startB-endB. Typically, one start/end of each region equals the 5'or 3' end of the chromosome. One may add a column \Rcode{reciprocal} saying \Rcode{TRUE}/\Rcode{FALSE} for every single entry. \\
+The next example is a simple simulation of the translocation t(9;22) leading to the BCR-ABL fusion gene. It uses simple breakpoints within 9q34.1 and 22q11.2 for demonstration:
+<<label=regionsExample5a, eval=TRUE>>=
+trans_BCR_ABL = GRanges(IRanges(133000000,141213431), seqnames="chr9", 
+chrB="chr22", startB=23000000, endB=51304566, reciprocal=TRUE)
+names(trans_BCR_ABL) = "BCR_ABL"
+trans_BCR_ABL
+@
+<<label=regionsExample5b, eval=FALSE>>=
+sim = simulateSV(output=NA, chrs=c("chr9", "chr22"), regionsTrans=trans_BCR_ABL,
+transInsert=20, bpSeqSize=50, random=FALSE)
+@
+The example is not executed here, because it requires the package \Rpackage{BSgenome.Hsapiens.UCSC.hg19}. Setting the argument \Rcode{transInsert=20} adds up to 20 random nucleotides at both breakpoints. \\
+
+It is strongly recommended to only use a set of non-overlapping SVs.
+
+\section{Comparing two sets of SVs}
+A typical use case of SV simulation with is the evaluation of SV detection algorithms. The function \Rfunction{compareSV} looks for overlaps between the output of the simulation, the ground truth (\Rfunarg{simSVs}), and the output of an SV detection program (\Rfunarg{querySVs}) up to a certain tolerance. It computes the sensitivity, precision and the percentage overlap between the breakpoint sequences (if available). \\
+An overlap is defined as the overlap between the breakpoints/breakpoint regions in \Rfunarg{simSVs}/\Rfunarg{querySVs} up to the given tolerance in bp. Overlap does not mean the whole affected region between the start and end of the SV. \\
+Unfortunately, there is currently no common standard format for SVs. Because the main information about SVs is their position in the genome and, sometimes, the breakpoint sequence (which depends on the SV detection algorithm), \Rfunction{compareSV} expects the SV detections as tables in a simple BED- or BEDPE format (\url{http://code.google.com/p/bedtools}). Deletions, inversions and tandem duplications, which affect one region on the genome,  can be either given in both formats. Translocations and insertions, which affect to regions on the genome, require the BEDPE-format. Eventually, the output of the SV detection format has to be converted accordingly (for example in R). \\
+The function only compares one SV type at a time, so \Rfunarg{querySVs} and \Rfunarg{simSVs} may not contain a mixture of different kinds of SVs. \\
+If the BED-tables for \Rfunarg{querySVs} or the simulation output are saved on disk, \Rfunction{compareSV} also accepts their filenames and loads the tables automatically as \Rcode{data.frame} in R. \\
+
+The following example simulates first five 5bp deletions in the small toy genome defined above: \\
+<<label=comparisonExample1, eval=TRUE>>=
+sim = simulateSV(output=NA, genome=genome, dels=5, sizeDels=5, bpSeqSize=10, seed=246)
+simSVs = metadata(sim)$deletions
+simSVs
+@
+An SV detection in BED format (the \Rfunarg{querySVs}) may look like this: Four of five deletions were detected, two with exact and two with an approximate breakpoint. Two additional deletions were detected, which were not part of the simulation. 
+<<label=comparisonExample2, eval=TRUE>>=
+querySVs = data.frame(
+  chr=c("chr1","chr1","chr1","chr2","chr2","chr2"), 
+  start=c(4,12,20,10,21,34), 
+  end=c(8,16,28,14,31,38), 
+  bpSeq=c("AAAAAAAAAA", "AAAAAAAAAT", "AAAATTTTTT", 
+    "GGGGGGGGGG", "GGGGGGGCCC", "CCCCCCCCCC")
+)
+querySVs
+@
+The column with the breakpoint sequence is optional, the column names not important (BED-files have no header). \\
+A comparison with 0bp tolerance yields only two overlaps:
+<<label=comparisonExample3, eval=TRUE>>=
+compareSV(querySVs, simSVs, tol=0)
+@
+A higher breakpoint tolerance of +/- 3bp also includes more imprecise detections:
+<<label=comparisonExample4, eval=TRUE>>=
+compareSV(querySVs, simSVs, tol=3)
+@
+Note that for \Rcode{deletion2}, the breakpoint sequence matched only by 50\%. \\
+
+The second example compares translocations:
+<<label=comparisonExample5, eval=TRUE>>=
+sim = simulateSV(output=NA, genome=genome, trans=2, percBalancedTrans=0.5, 
+bpSeqSize=10, seed=246)
+simSVs = metadata(sim)$translocations
+simSVs
+@
+Detected translocations have to be given in BEDPE-format (i.e. at least six columns chr1, start1, end1, chr2, start2, end2 for the breakpoints on both chromosomes). In this example, the breakpoints were approximated up to 1bp or 2bp, optional breakpoint sequences are missing:
+<<label=comparisonExample6, eval=TRUE>>=
+querySVs = data.frame(
+  chr=c("chr2", "chr1", "chr2"), 
+  start1=c(25,3,9), 
+  end1=c(29,7,12), 
+  chr2=c("chr1","chr2","chr1"),
+  start2=c(22,10,3),
+  end2=c(25,13,4)
+)
+querySVs
+@
+Here, all detected SVs span the simulated breakpoints:
+<<label=comparisonExample7, eval=TRUE>>=
+compareSV(querySVs, simSVs, tol=0)
+@
+
+\section{Setting structural variation sizes}
+One may specify just one size in the parameters \Rfunarg{sizeDels}, \Rfunarg{sizeIns}, \Rfunarg{sizeInvs} or \Rfunarg{sizeDups} that applies to every SV of each type. But often, it might be more realistic to assign an individual, arbitrary size to every single SV. In the simplest case, they may be uniformly distributed:
+<<echo=FALSE>>=
+set.seed(246)
+@
+<<label=sizesExample1, eval=TRUE>>=
+sizes = sample(3:10, 5, replace=TRUE)
+sizes
+sim = simulateSV(output=NA, genome=genome, dels=5, sizeDels=sizes, bpSeqSize=6, seed=246)
+sim
+metadata(sim)
+@
+\subsection{Estimating size distribution from real data}
+According to studies from the 1000 Genomes Project, for deletions, insertions and duplications, the amount of SVs decreases rather quickly as their size increases (\cite{1000genomes1}). The function \Rfunction{estimateSVSizes} simulates SV sizes by fitting a beta distribution, which is flexible enough to realistically model the shape of the size distribution of all four SV types. Its two shape parameters can be derived from a given vector of SV sizes. This requires the R-package \Rpackage{MASS}.\\
+The following toy example draws 1.000 SV sizes between 10bp and 1000bp from a beta distribution based on a  vector of 15 SV sizes:
+<<label=sizesExample2, eval=TRUE,fig=TRUE,include=FALSE,eps=FALSE,pdf=TRUE,width=9,height=9>>=
+svSizes = c(10,20,30,40,60,80,100,150,200,250,300,400,500,750,1000)
+simSizes = estimateSVSizes(n=1000, svSizes=svSizes, minSize=10, maxSize=1000, hist=TRUE) 
+head(simSizes, n=20)
+@
+The \Rfunarg{minSize} and \Rfunarg{maxSize} can be omitted; they are then calculated from the given set of \Rfunarg{svSizes}. It is recommended to uses a \Rfunarg{minSize} and \Rfunarg{maxSize} that is consistent with the minimum/maximum values in \Rfunarg{svSizes}. \\
+Setting the parameter \Rcode{hist=TRUE} also plots a histogram of the SV sizes to give an impression of their distribution (see Fig.1).
+\begin{figure}[p]
+\begin{center}
+  \includegraphics[height=9cm, width=9cm]{RSVSim-sizesExample2}
+  \caption{Distribution of 1.000 SV sizes drawn from a beta distribution using function \Rfunction{estimateSVSizes}.}
+\end{center}
+\end{figure}
+
+For deletions, insertions, inversions and tandem duplications, \Rfunction{estimateSVSizes} can use default parameters for the beta distribution. They were estimated from the Database of Genomic Variants (DGV) release 2012-03-29 (\cite{dgv}). Hence, no set of SV sizes is needed for fitting the distribution. In total, 1.129 deletions, 490 insertions, 202 inversions and 145 tandem duplications between 500bp and 10kb were used to estimate the shape. The parameter \Rfunarg{default} can be set to either \Rcode{"deletions"}, \Rcode{"insertions"}, \Rcode{"inversions"} or \Rcode{"tandemDuplications"} to use the according set of shape parameters:
+<<label=sizesExample3, eval=TRUE,fig=TRUE,include=FALSE,eps=FALSE,pdf=TRUE,width=9,height=9>>=
+delSizes = estimateSVSizes(n=10000, minSize=500, maxSize=10000, 
+default="deletions", hist=TRUE)
+head(delSizes, n=15)
+@
+<<label=sizesExample4, eval=TRUE,fig=TRUE,include=FALSE,eps=FALSE,pdf=TRUE,width=9,height=9>>=
+delSizes = estimateSVSizes(n=10000, minSize=500, maxSize=10000, 
+default="insertions", hist=TRUE)
+head(delSizes, n=15)
+@
+<<label=sizesExample5, eval=TRUE,fig=TRUE,include=FALSE,eps=FALSE,pdf=TRUE,width=9,height=9>>=
+invSizes = estimateSVSizes(n=10000, minSize=500, maxSize=10000, 
+default="inversions", hist=TRUE)
+head(invSizes, n=15)
+@
+<<label=sizesExample6, eval=TRUE,fig=TRUE,include=FALSE,eps=FALSE,pdf=TRUE,width=9,height=9>>=
+delSizes = estimateSVSizes(n=10000, minSize=500, maxSize=10000, 
+default="tandemDuplications", hist=TRUE)
+head(delSizes, n=15)
+@
+See Fig.2, Fig.3, Fig.4 and Fig.5 to see the estimated distribution based on the SVs in the DGV. When using these default values, it is recommended to simulate SVs that do not differ too much in size (aroung 500bp-10kb).
+\begin{figure}[p]
+\begin{center}
+  \includegraphics[height=9cm, width=9cm]{RSVSim-sizesExample3}
+  \caption{Distribution of 10.000 deletion sizes based on deletions from the Database of Genomic Variants.}
+\end{center}
+\end{figure}
+\begin{figure}[p]
+\begin{center}
+  \includegraphics[height=9cm, width=9cm]{RSVSim-sizesExample4}
+  \caption{Distribution of 10.000 insertion sizes based on insertions from the Database of Genomic Variants.}
+\end{center}
+\end{figure}
+\begin{figure}[p]
+\begin{center}
+  \includegraphics[height=9cm, width=9cm]{RSVSim-sizesExample4}
+  \caption{Distribution of 10.000 inversion sizes based on inversions from the Database of Genomic Variants.}
+\end{center}
+\end{figure}
+\begin{figure}[p]
+\begin{center}
+  \includegraphics[height=9cm, width=9cm]{RSVSim-sizesExample5}
+  \caption{Distribution of 10.000 tandem duplication sizes based on tandem duplications from the Database of Genomic Variants.}
+\end{center}
+\end{figure}
+
+\begin{thebibliography}{}
+
+\bibitem[Huang {\it et al}., 2011]{art} Huang W. {\it et al} (2011) ART: a next-generation sequencing read simulator, {\it Bioinformatics}, {\bf 28 (4)}, 593-594.
+\bibitem[Hu {\it et~al}., 2012]{pirs} Hu X. {\it et~al} (2012) pIRS: Profile-based Illumina pair-end reads simulator, {\it Bioinformatics}, {\bf 28(11)}, 1533-1535.
+\bibitem[Iafrate {\it et al}., 2004]{dgv} Iafrate A.J. {\it et al} (2004) Detection of large-scale variation in the human genome, {\it Nat Genet.}, {\bf 36(9)}, 949-951.
+\bibitem[Mills {\it et al}., 2011]{1000genomes1} Mills R.E. {\it et al} (2011) Mapping copy number variation by population-scale genome sequencing, {\it Nature}, {\bf 470(7332)}, 59-65.
+
+\end{thebibliography}
+
+
+\section{Session Information}
+<<sessionInfo, echo=FALSE>>=
+sessionInfo()
+@
+
+\end{document}
