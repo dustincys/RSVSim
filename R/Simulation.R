@@ -1,20 +1,69 @@
 ## calculate SV breakpoint coordinates #################################################
 
-.drawPos <- function(bpRegions, size){
+.drawPos <- function(chr, bpRegionsList, weightsMechanisms, weightsRepeats, size){
 
+  ## sample mechanism
+  idx = weightsMechanisms[,1] > 0
+  mechanism = sample(rownames(weightsMechanisms)[idx], 1, prob=weightsMechanisms[idx,1])
+  ## sample region type (kind of repeat or any other region)
+  idx = weightsRepeats[, mechanism] > 0
+  regionType = sample(rownames(weightsRepeats[, mechanism, drop=FALSE])[idx], 1, prob=weightsRepeats[idx, mechanism])
+  
+  bpRegions = bpRegionsList[[regionType]]
+  bpRegions = bpRegions[seqnames(bpRegions) == chr]
+  
+  ## for NAHR and NHR use the flanking regions of repeats
+  ## select flanking regions of the size of the SV
+  ## make sure the flanking regions overlap with valid "normal" regions
+  if(mechanism %in% c("NAHR", "NHR") & regionType != "Random"){
+    ## random distance to the repeats (0-10bp)
+    dist1 = sample(0:10, length(bpRegions), replace=TRUE)
+    dist2 = sample(0:10, length(bpRegions), replace=TRUE)
+    flanks = c(flank(x=bpRegions+dist1, width=size, start=TRUE), flank(x=bpRegions+dist2, width=size, start=FALSE))
+    bpRegions = flanks[queryHits(findOverlaps(flanks, bpRegionsList[["Random"]], type="within"))]
+  }
+  ## for TEI and VNTR use the regions itself
+  ## but make sure they are large enough by extending the regions at the start or end (randomly)
+  if(mechanism %in% c("TEI", "VNTR") & regionType != "Random"){
+    tooSmall = width(bpRegions) < size
+    extendStart = sample(c(TRUE,FALSE), length(bpRegions), replace=TRUE)
+    diff = size - width(bpRegions)
+    start(bpRegions[tooSmall&extendStart]) = start(bpRegions[tooSmall&extendStart]) - diff[tooSmall&extendStart]
+    end(bpRegions[tooSmall&!extendStart]) = end(bpRegions[tooSmall&!extendStart]) + diff[tooSmall&!extendStart]    
+    bpRegions = bpRegions[queryHits(findOverlaps(bpRegions, bpRegionsList[["Random"]], type="within"))]
+  }
+  ## for any other "normal" mechanism and region just use the regions itself
+  ## select only those which are large enough
+  if(mechanism == "Other" | regionType == "Random"){
+    bpRegions = bpRegions[width(bpRegions) >= size]
+  }
+
+  if(length(bpRegions) == 0){
+    stop("There is no region large enough for SV of size ", size, "bp")
+  }
+    
   ## randomly select a region (larger regions have higher probability)
-  ## regions have a width >= size
-  idx = sample(x=1:length(bpRegions), size=1, prob=width(bpRegions))  
-  start = sample(x=start(bpRegions[idx]):(end(bpRegions[idx])-size+1), size=1)
-  end =  start + size -1
+  ## for NAHR and NHR, just use the flanking regions which already have the right size
+  idx = sample(x=1:length(bpRegions), size=1, prob=width(bpRegions))
+  if(mechanism %in% c("NAHR", "NHR")){
+    start = start(bpRegions[idx])
+    end = end(bpRegions[idx])
+  }
+  ## for any other regions (including TEIs and VNTRs), randomly select start and end within the region (regions are already large enough)
+  if(mechanism %in% c("TEI", "VNTR", "Other")){
+    start = sample(x=start(bpRegions[idx]):(end(bpRegions[idx])-size+1), size=1)
+    end =  start + size -1
+  }
+#  return(data.frame(seqnames=unique(seqnames(bpRegions)), start=start, end=end, mechanism=mechanism, bpRegion=regionType))
   return(data.frame(seqnames=unique(seqnames(bpRegions)), start=start, end=end))
 }
 
 
-.drawPos_trans <- function(genome, bpRegions, chr){  
+.drawPos_trans <- function(chr, genome, bpRegionsList, weightsMechanisms, weightsRepeats){  
  
   ## draw breakpoint position and set the start/end to the outmost coordinate (1 for 5', chromosome end for 3')
-  pos = .drawPos(bpRegions, 1) ## here: size = 1 -> start = end
+  pos = .drawPos(chr, bpRegionsList, weightsMechanisms, weightsRepeats, 1) ## here: size = 1 -> start = end
+  
   ## choose start or end whether the start/end of translocation is closer to start/end of the genome
   center = round(length(genome[[chr]]) / 2) + 1
   if(nrow(pos) > 0){
@@ -31,7 +80,7 @@
 
 ## 1. translocations  #####################################################################
 
-.simTranslocationPositions <- function(n, bpRegions, genome, percBalancedTrans, sizes){
+.simTranslocationPositions <- function(n, bpRegionsList, weightsMechanisms, weightsRepeats, genome, percBalancedTrans, sizes, verbose){
   
   posTrans_1 = .getDummyDataframe()
   posTrans_2 = .getDummyDataframe()
@@ -39,18 +88,22 @@
   invertedTrans = c()
 
   if(n > 0){
+    
+    if(verbose==TRUE) pb = txtProgressBar(min = 0, max = n, style = 3)
+    
     for(i in 1:n){
       
       ## first translocation partner
       ## check if regions on two different chromosomes are available
-      if(length(unique(seqnames(bpRegions))) < 2){
-        stop("No two chromosomes available for translocations")
-      }
+#      if(length(unique(seqnames(bpRegions))) < 2){
+#        stop("No two chromosomes available for translocations")
+#      }
       ## sample chromosome; larger chromosomes have a higher probability
-      chrs = levels(seqnames(bpRegions))
-      probs = sapply(chrs, function(x){return(sum(width(bpRegions[seqnames(bpRegions) == x])))})
+      chrs = seqlevels(bpRegionsList[["Random"]])
+      probs = sapply(chrs, function(x){return(sum(width(bpRegionsList[["Random"]][seqnames(bpRegionsList[["Random"]]) == x])))})
       chr1 = as.character(sample(chrs, 1, prob=probs))
-      pos1 = .drawPos_trans(genome, bpRegions[seqnames(bpRegions) == chr1], chr1)
+      
+      pos1 = .drawPos_trans(chr1, genome, bpRegionsList, weightsMechanisms, weightsRepeats)
       posTrans_1 = rbind(posTrans_1, pos1)
       
       ## make sure new SVs do not overlap with this one
@@ -62,13 +115,14 @@
       }else{
         start(pos) = center
       }
-      bpRegions = .subtractIntervals(bpRegions, pos)
+      bpRegionsList[["Random"]] = .subtractIntervals(bpRegionsList[["Random"]], pos)
 
       ## second translocation partner
       chrs = chrs[chrs != chr1] # make sure second translocated segments lies on different chromosome
-      probs = sapply(chrs, function(x){return(sum(width(bpRegions[seqnames(bpRegions) == x])))})
+      probs = sapply(chrs, function(x){return(sum(width(bpRegionsList[["Random"]][seqnames(bpRegionsList[["Random"]]) == x])))})
       chr2 = as.character(sample(chrs, 1, prob=probs))
-      pos2 = .drawPos_trans(genome, bpRegions[seqnames(bpRegions) == chr2], chr2)
+      
+      pos2 = .drawPos_trans(chr2, genome, bpRegionsList, weightsMechanisms, weightsRepeats)
       posTrans_2 = rbind(posTrans_2, pos2)
       
       ## make sure new SVs do not overlap with this one
@@ -80,13 +134,18 @@
       }else{
         start(pos) = center
       }
-      bpRegions = .subtractIntervals(bpRegions, pos)
+      bpRegionsList[["Random"]] = .subtractIntervals(bpRegionsList[["Random"]], pos)
       
       ## always invert translocated segments between different ends (5'<->3' or 3'<->5')
       if((pos1$start == 1 & pos2$start != 1) | (pos1$start != 1 & pos2$start == 1)){
         invertedTrans = c(invertedTrans, i)
       }
+      
+      if(verbose==TRUE) setTxtProgressBar(pb, i)
+
     }
+    
+    if(verbose==TRUE) close(pb)
     
     ## randomly select translocations to be balanced
     balancedTrans = sample(1:n, round(n*percBalancedTrans))  ## indices of balanced translocations
@@ -112,41 +171,40 @@
 
 ## 2. insertions  #####################################################################
 
-.simInsertionPositions <- function(n, bpRegions, genome, sizes, percCopiedIns){
+.simInsertionPositions <- function(n, bpRegionsList, weightsMechanisms, weightsRepeats, genome, sizes, percCopiedIns, verbose){
   
   posIns_1 = .getDummyDataframe()
   posIns_2 = .getDummyDataframe()
-#  insertions = data.frame(Type="",ChrA=0,StartA=0,EndA=0,ChrB=0,StartB=0,EndB=0,BpSeqA_5prime="",BpSeqA_3prime="",BpSeqB_5prime="",BpSeqB_3prime="", stringsAsFactors=FALSE)[-1, ]
 
   if(n > 0){
+    if(verbose==TRUE) pb = txtProgressBar(min = 0, max = n, style = 3)
     for(i in 1:n){
-      
+     
       ## first translocation partner
-      bpRegionsGood = bpRegions[width(bpRegions) >= sizes[i]]
-      ## check if regions on two different chromosomes are available
-      if(length(unique(seqnames(bpRegionsGood))) < 2){
-        stop("No two chromosomes available for insertions")
-      }
+
       ## sample chromosome; larger chromosomes have a higher probability
-      chrs = levels(seqnames(bpRegions))
-      probs = sapply(chrs, function(x){return(sum(width(bpRegions[seqnames(bpRegions) == x])))})
+      chrs = seqlevels(bpRegionsList[["Random"]])
+      probs = sapply(chrs, function(x){return(sum(width(bpRegionsList[["Random"]][seqnames(bpRegionsList[["Random"]]) == x])))})
       chr1 = as.character(sample(chrs, 1, prob=probs))
-      pos1 = .drawPos(bpRegionsGood[seqnames(bpRegionsGood) == chr1], sizes[i])
+      
+      pos1 = .drawPos(chr1, bpRegionsList, weightsMechanisms, weightsRepeats, sizes[i])
       posIns_1 = rbind(posIns_1, pos1)
       
       ## make sure new SVs do not overlap with this one
-      bpRegionsGood = .subtractIntervals(bpRegionsGood, GRanges(IRanges(pos1$start, pos1$end), seqnames=pos1$seqnames))
+      bpRegionsList[["Random"]] = .subtractIntervals(bpRegionsList[["Random"]], GRanges(IRanges(pos1$start, pos1$end), seqnames=pos1$seqnames))
       
       ## second translocation partner
       chrs = chrs[chrs != chr1] # make sure second translocated segments lies on different chromosome
-      probs = sapply(chrs, function(x){return(sum(width(bpRegions[seqnames(bpRegions) == x])))})
+      probs = sapply(chrs, function(x){return(sum(width(bpRegionsList[["Random"]][seqnames(bpRegionsList[["Random"]]) == x])))})
       chr2 = as.character(sample(chrs, 1, prob=probs))
-      pos2 = .drawPos(bpRegionsGood[seqnames(bpRegionsGood) == chr2], sizes[i])
+      
+      pos2 = .drawPos(chr2, bpRegionsList, weightsMechanisms, weightsRepeats, sizes[i])
       posIns_2 = rbind(posIns_2, pos2)
       
       ## make sure new SVs do not overlap with this one
-      bpRegions = .subtractIntervals(bpRegions, GRanges(IRanges(pos1$start, pos1$end), seqnames=pos1$seqnames))
-      bpRegions = .subtractIntervals(bpRegions, GRanges(IRanges(pos2$start, pos2$end), seqnames=pos2$seqnames))
+      bpRegionsList[["Random"]] = .subtractIntervals(bpRegionsList[["Random"]], GRanges(IRanges(pos2$start, pos2$end), seqnames=pos2$seqnames))
+      
+      if(verbose==TRUE) setTxtProgressBar(pb, i)
     }
     
     ## randomly select insertions to be copied
@@ -158,31 +216,32 @@
     ## requires: inverted and balanced are the same for both translocation partners
     insertions = cbind(paste("insertion_", 1:n, sep=""), posIns_1[, 1:3], posIns_2[, 1:3], sizes, posIns_2[, "copied"])
     colnames(insertions) = c("Name", "ChrA", "StartA", "EndA", "ChrB", "StartB", "EndB", "Size", "Copied")
-
+    
   }
+
+  if(verbose==TRUE) close(pb)
 
   return(list(insertions, posIns_1, posIns_2))
 }  
 
 
 ## 3.  deletions, inversions and tandem duplications #################################
-.simPositions <- function(n, bpRegions, sizes, type){
+.simPositions <- function(n, bpRegionsList, weightsMechanisms, weightsRepeats, sizes, type, verbose){
   
   pos = .getDummyDataframe()
-#  svs = data.frame(Type="", Space=0,Start=0,End=0,Size=0,BpSeq="", stringsAsFactors=FALSE)[-1, ]
+
   if(n > 0){
-    for(i in 1:n){
-      bpRegionsGood = bpRegions[width(bpRegions) >= sizes[i]]
-      if(length(bpRegionsGood) == 0){
-        stop("There is no region large enough for ", type, " of size ", sizes[i], "bp")
-      }
+    if(verbose==TRUE) pb = txtProgressBar(min = 0, max = n, style = 3)
+    for(i in 1:n){      
       ## sample chromosome; larger chromosomes have a higher probability
-      chrs = levels(seqnames(bpRegionsGood))
-      probs = sapply(chrs, function(x){return(sum(width(bpRegionsGood[seqnames(bpRegionsGood) == x])))})
+      chrs = seqlevels(bpRegionsList[["Random"]])
+      probs = sapply(chrs, function(x){return(sum(width(bpRegionsList[["Random"]][seqnames(bpRegionsList[["Random"]]) == x])))})
       chr = sample(chrs, 1, prob=probs)
-      p = .drawPos(bpRegionsGood[seqnames(bpRegionsGood) == chr], sizes[i])
+
+      p = .drawPos(chr, bpRegionsList, weightsMechanisms, weightsRepeats, sizes[i])
       pos = rbind(pos, p)    
-      bpRegions = .subtractIntervals(bpRegions, GRanges(IRanges(p$start, p$end), seqnames=p$seqnames))
+      bpRegionsList[["Random"]] = .subtractIntervals(bpRegionsList[["Random"]], GRanges(IRanges(p$start, p$end), seqnames=p$seqnames))
+      if(verbose==TRUE) setTxtProgressBar(pb, i)
     }
     
     svs = cbind("", pos, 0)
@@ -191,6 +250,8 @@
     svs$Name = paste(type, 1:n, sep="")
 
   }
+  
+  if(verbose==TRUE) close(pb)
 
   return(list(svs, pos))
 }

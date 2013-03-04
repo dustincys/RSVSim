@@ -5,7 +5,7 @@ setMethod("estimateSVSizes",
               stop("Invalid argument: No default values for SV type ", default)
             }
             ## Default shape parameters were estimated from DGV release 2012-03-29
-            ## Only studies with "method=sequencing" and size between 500bp and 10kb were selected
+            ## Only studies with "method=sequencing" and size between 500bp and 10kb were selected (for insertions the extreme peak between 6000bp and 6200bp has been removed)
             ## SVs left: 1129 Deletions, 490 Insertions, 202 Inversions, 145 Tandem Duplications
             if(default == "deletions"){
               shape1=0.3692374
@@ -358,6 +358,114 @@ setMethod("compareSV",
 
 }
 
+
+.readRepeatMaskerOutput <- function(file, save=TRUE){
+  t = read.table(file, skip=2, fill=TRUE, stringsAsFactors=FALSE, colClasses=c("numeric","numeric","numeric","numeric","character","numeric","numeric","character","character","character","character","character","character","character","numeric"))
+
+  t = t[t[, 5] %in% paste("chr", c(1:22,"X","Y"), sep=""), ]
+  t = t[t[, 11] %in% c("LINE/L1","LINE/L2","SINE/Alu","SINE/MIR"), ]
+  t[, 11] = gsub("LINE/","", t[, 11])
+  t[, 11] = gsub("SINE/","", t[, 11])
+  repeats = GRanges(IRanges(t[, 6], t[, 7]), seqnames=t[, 5], type=t[, 11])
+
+  linesL1 = repeats[repeats$type == "L1"]
+  linesL2 = repeats[repeats$type == "L2"]
+  sinesAlu = repeats[repeats$type == "Alu"]
+  sinesMIR = repeats[repeats$type == "MIR"]
+  ## load previously saved segmental duplications to avoid import from UCSC browser
+  if(file.exists(file.path(path.package("RSVSim"), "data", "segmentalDuplications.RData"))){
+    data("segmentalDuplications")
+  }else{
+    require(rtracklayer)
+    segDups = .loadFromUCSC_SegDups()
+  }
+  trs = .loadFromBSGenome_TandemRepeats()
+  repeats = list(linesL1, linesL2, sinesAlu, sinesMIR, segDups, trs)
+  if(save == TRUE){
+    save(repeats, file=file.path(path.package("RSVSim"), "data", "repeats_hg19.RData"), compression_level=9, compress="bzip2")
+   }
+  return(repeats)
+}
+
+## Loading the rmsk-track from UCSC may take up to 40 Minutes
+.loadFromUCSC_RepeatMasks <- function(save=TRUE, verbose){
+  
+  ## from UCSV
+  require(rtracklayer)
+  chrs = paste("chr", c(1), sep="")
+  mySession = browserSession("UCSC")
+  genome(mySession) = "hg19"
+
+  rmskTrack = ucscTableQuery(mySession, track="rmsk")
+  chrs = paste("chr", c(1:22,"X","Y"), sep="")
+  repeats = GRanges()
+
+  if(verbose==TRUE) pb = txtProgressBar(min = 0, max = length(chrs), style = 3)
+
+  for(i in 1:length(chrs)){
+    c = chrs[i]
+    rmskTrackChr = rmskTrack
+    range(rmskTrackChr) = range(rmskTrackChr)[seqnames(range(rmskTrackChr)) == c]
+    repeats_df = getTable(rmskTrackChr)
+    repeats = c(repeats, GRanges(IRanges(repeats_df$genoStart, repeats_df$genoEnd), seqnames=factor(repeats_df$genoName, levels=chrs), type=as.character(repeats_df$repFamily)))
+    
+    if(verbose==TRUE) setTxtProgressBar(pb, i)
+
+  }
+  if(verbose==TRUE) close(pb)
+  
+  linesL1 = repeats[repeats$type == "L1"]
+  linesL2 = repeats[repeats$type == "L2"]
+  sinesAlu = repeats[repeats$type == "Alu"]
+  sinesMIR = repeats[repeats$type == "MIR"]  
+  ## load previously saved segmental duplications to avoid import from UCSC browser
+  if(file.exists(file.path(path.package("RSVSim"), "data", "segmentalDuplications.RData"))){
+    data("segmentalDuplications")
+  }else{
+    segDups = .loadFromUCSC_SegDups()
+  }
+  trs = .loadFromBSGenome_TandemRepeats()
+  repeats = list(linesL1, linesL2, sinesAlu, sinesMIR, segDups, trs)
+  if(save == TRUE){
+    save(repeats, file=file.path(path.package("RSVSim"), "data", "repeats_hg19.RData"), compression_level=9, compress="bzip2")
+  }
+  return(repeats)
+}
+
+.loadFromUCSC_SegDups <- function(){
+  chrs = paste("chr", c(1:22,"X","Y"), sep="")
+
+  mySession = browserSession("UCSC")
+  genome(mySession) = "hg19"
+
+  segDups = getTable(ucscTableQuery(mySession, track="genomicSuperDups"))
+  segDups = segDups[segDups$chrom %in% chrs & segDups$otherChrom %in% chrs, ]
+  segDups = c(
+    GRanges(IRanges(segDups$chromStart, segDups$chromEnd), seqnames=as.character(segDups$chrom)),
+    GRanges(IRanges(segDups$otherStart, segDups$otherEnd), seqnames=as.character(segDups$otherChrom))
+    )
+  segDups$type = "SD"
+  
+  return(segDups)
+}
+
+.loadFromBSGenome_TandemRepeats <- function(){
+  ## this function requires BSgenome.Hsapiens.UCSC.hg19 to be loaded
+  chrs = paste("chr", c(1:22,"X","Y"), sep="")
+  tr = GRanges()
+  seqlevels(tr) = chrs
+  for(c in chrs){
+    t = as(masks(Hsapiens[[c]])["TRF"], "data.frame")
+    t = GRanges(IRanges(t$start, t$end), seqnames=c)
+    seqlevels(t) = chrs
+    tr = c(tr, t)
+  }  
+  tr$type = "TR"
+  return(tr)
+  
+}
+
+
 ##########################################################################################################
 ## Methods for internal use only
 ##########################################################################################################
@@ -391,12 +499,18 @@ setMethod("compareSV",
 ## e.g. subtract gaps from genome ranges
 .subtractIntervals <- function(subject, subtrahend){
   
-  diff = setdiff(disjoin(c(subject,subtrahend)), subtrahend)
+#  diff = setdiff(disjoin(c(subject,subtrahend)), subtrahend)
+  diff = setdiff(subject, subtrahend)
   return(diff)
   
 }
 
-## This function is only for internal purposes
+subject = GRanges(IRanges(c(1,11,21),c(10,20,30)), seqnames=c("A","B","C"), type=c("t1","t2","t3"))
+names(subject) = c("t1","t2")
+subtrahend = GRanges(IRanges(c(4,6),c(14,16)), seqnames=c("A","B"), type=c("t4","t5"))
+names(subtrahend) = c("t3","t4")
+
+## These functions are only for internal purposes
 .testSVSim <- function(){
 
   runs = 10
@@ -420,27 +534,29 @@ setMethod("compareSV",
       ))
     names(genome) = c("chr1","chr2","chr3","chr4","chr5","chr6")
     
-    dels = 50
-    ins = 50
-    invs = 50
-    dups = 50
+    dels = 10
+    ins = 10
+    invs = 10
+    dups = 10
     trans = 5
     sizeDels = sample(1000:5000, dels, replace=TRUE)
     sizeIns = sample(1000:5000, ins, replace=TRUE)
     sizeInvs = sample(1000:5000, invs, replace=TRUE)
     sizeDups = sample(1000:5000, dups, replace=TRUE)
     bpSeqSize = 300
-    sim = simulateSV(output=NA, genome=genome, dels=dels, ins=ins, invs=invs, dups=dups, trans=trans, sizeDels=sizeDels, sizeIns=sizeIns, sizeInvs=sizeInvs, sizeDups=sizeDups, maxDups=10, bpSeqSize=bpSeqSize, random=TRUE)
+    sim = simulateSV(output=NA, genome=genome, dels=dels, ins=ins, invs=invs, dups=dups, trans=trans, sizeDels=sizeDels, sizeIns=sizeIns, sizeInvs=sizeInvs, sizeDups=sizeDups, maxDups=10, bpSeqSize=bpSeqSize, random=TRUE, repeatBias=FALSE, percSNPs=0, indelProb=0)
 
+    ## sim2 is for testing the non-random implementation of predefined sv regions
     regionsDels = GRanges(IRanges(metadata(sim)$deletions$Start, metadata(sim)$deletions$End), seqnames=metadata(sim)$deletions$Chr)
     regionsIns = GRanges(IRanges(metadata(sim)$insertions$StartA, metadata(sim)$insertions$EndA), seqnames=metadata(sim)$insertions$ChrA, chrB=metadata(sim)$insertions$ChrB, startB=metadata(sim)$insertions$StartB, endB=metadata(sim)$insertions$EndB)
     regionsInvs = GRanges(IRanges(metadata(sim)$inversions$Start, metadata(sim)$inversions$End), seqnames=metadata(sim)$inversions$Chr)
     regionsDups = GRanges(IRanges(metadata(sim)$tandemDuplications$Start, metadata(sim)$tandemDuplications$End), seqnames=metadata(sim)$tandemDuplications$Chr)
     regionsTrans = GRanges(IRanges(metadata(sim)$translocations$StartA, metadata(sim)$translocations$EndA), seqnames=metadata(sim)$translocations$ChrA, chrB=metadata(sim)$translocations$ChrB, startB=metadata(sim)$translocations$StartB, endB=metadata(sim)$translocations$EndB)
-    sim2 = simulateSV(output=NA, genome=genome, dels=dels, ins=ins, invs=invs, dups=dups, trans=trans, sizeDels=sizeDels, sizeIns=sizeIns, sizeInvs=sizeInvs, sizeDups=sizeDups, regionsDels=regionsDels, regionsIns=regionsIns, regionsInvs=regionsInvs, regionsDups=regionsDups, regionsTrans=regionsTrans, maxDups=10, bpSeqSize=bpSeqSize, random=FALSE)
+    sim2 = simulateSV(output=NA, genome=genome, dels=dels, ins=ins, invs=invs, dups=dups, trans=trans, sizeDels=sizeDels, sizeIns=sizeIns, sizeInvs=sizeInvs, sizeDups=sizeDups, regionsDels=regionsDels, regionsIns=regionsIns, regionsInvs=regionsInvs, regionsDups=regionsDups, regionsTrans=regionsTrans, maxDups=10, bpSeqSize=bpSeqSize, random=FALSE, repeatBias=FALSE, percSNPs=0, indelProb=0)
     sim = sim2
     
     bpSeqSize = bpSeqSize / 2
+    maxMismatch = 0
     for(type in c("deletions","insertions","inversions","tandemDuplications","translocations")){
       sv = metadata(sim)[[type]]
       
@@ -449,9 +565,9 @@ setMethod("compareSV",
         iscorrect = c()
         for(i in 1:nrow(sv)){
           seq = DNAString(sv$BpSeq[i])
-          aln = matchPattern(subseq(seq, 1, bpSeqSize), genome[[as.character(sv$Chr[i])]])
+          aln = matchPattern(subseq(seq, 1, bpSeqSize), genome[[as.character(sv$Chr[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
           s = (start(aln) == (sv$Start[i] - bpSeqSize))
-          aln = matchPattern(subseq(seq, bpSeqSize+1, bpSeqSize*2), genome[[as.character(sv$Chr[i])]])
+          aln = matchPattern(subseq(seq, bpSeqSize+1, bpSeqSize*2), genome[[as.character(sv$Chr[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
           e = (end(aln) == (sv$End[i] + bpSeqSize))
           iscorrect = c(iscorrect, s & e)
         }
@@ -467,17 +583,17 @@ setMethod("compareSV",
           
           ## 5' breakpoint sequence
           seq = DNAString(sv$BpSeq_5prime[i])
-          aln = matchPattern(subseq(seq, 1, bpSeqSize), genome[[as.character(sv$Chr[i])]])
+          aln = matchPattern(subseq(seq, 1, bpSeqSize), genome[[as.character(sv$Chr[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
           s = (start(aln) == (sv$Start[i] - bpSeqSize))
-          aln = matchPattern(reverseComplement(subseq(seq, bpSeqSize+1, bpSeqSize*2)), genome[[as.character(sv$Chr[i])]])
+          aln = matchPattern(reverseComplement(subseq(seq, bpSeqSize+1, bpSeqSize*2)), genome[[as.character(sv$Chr[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
           e = (end(aln) == sv$End[i])
           iscorrect = c(iscorrect, s & e)
           
           ## 3' breakpoint sequence
           seq = DNAString(sv$BpSeq_3prime[i])
-          aln = matchPattern(reverseComplement(subseq(seq, 1, bpSeqSize)), genome[[as.character(sv$Chr[i])]])
+          aln = matchPattern(reverseComplement(subseq(seq, 1, bpSeqSize)), genome[[as.character(sv$Chr[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
           s = (start(aln) == sv$Start[i])
-          aln = matchPattern(subseq(seq, bpSeqSize+1, bpSeqSize*2), genome[[as.character(sv$Chr[i])]])
+          aln = matchPattern(subseq(seq, bpSeqSize+1, bpSeqSize*2), genome[[as.character(sv$Chr[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
           e = (end(aln) == (sv$End[i]+ bpSeqSize))
           iscorrect = c(iscorrect, s & e)
         }
@@ -494,25 +610,25 @@ setMethod("compareSV",
           
           ## breakpoint sequence A (deleted segment)
           seq = DNAString(sv$BpSeqA[i])
-          aln = matchPattern(subseq(seq, 1, bpSeqSize), genome[[as.character(sv$ChrA[i])]])
+          aln = matchPattern(subseq(seq, 1, bpSeqSize), genome[[as.character(sv$ChrA[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
           s = (start(aln) == (sv$StartA[i] - bpSeqSize))
-          aln = matchPattern(subseq(seq, bpSeqSize+1, bpSeqSize*2), genome[[as.character(sv$ChrA[i])]])
+          aln = matchPattern(subseq(seq, bpSeqSize+1, bpSeqSize*2), genome[[as.character(sv$ChrA[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
           e = (end(aln) == (sv$EndA[i] + bpSeqSize))
           iscorrect = c(iscorrect, s & e)
           
           ## breakpoint sequence B 5'
           seq = DNAString(sv$BpSeqB_5prime[i])
-          aln = matchPattern(subseq(seq, 1, bpSeqSize), genome[[as.character(sv$ChrB[i])]])
+          aln = matchPattern(subseq(seq, 1, bpSeqSize), genome[[as.character(sv$ChrB[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
           s = (start(aln) == (sv$StartB[i] - bpSeqSize))
-          aln = matchPattern(subseq(seq, bpSeqSize+1, bpSeqSize*2), genome[[as.character(sv$ChrA[i])]])
+          aln = matchPattern(subseq(seq, bpSeqSize+1, bpSeqSize*2), genome[[as.character(sv$ChrA[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
           e = (start(aln) == sv$StartA[i])
           iscorrect = c(iscorrect, s & e)
           
           ## breakpoint sequence B 3'
           seq = DNAString(sv$BpSeqB_3prime[i])
-          aln = matchPattern(subseq(seq, 1, bpSeqSize), genome[[as.character(sv$ChrA[i])]])
+          aln = matchPattern(subseq(seq, 1, bpSeqSize), genome[[as.character(sv$ChrA[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
           s = (end(aln) == sv$EndA[i])
-          aln = matchPattern(subseq(seq, bpSeqSize+1, bpSeqSize*2), genome[[as.character(sv$ChrB[i])]])
+          aln = matchPattern(subseq(seq, bpSeqSize+1, bpSeqSize*2), genome[[as.character(sv$ChrB[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
           e = (start(aln) == sv$StartB[i])
           
           iscorrect = c(iscorrect, s & e)
@@ -528,12 +644,12 @@ setMethod("compareSV",
         iscorrect = c()
         for(i in 1:nrow(sv)){
           seq = DNAString(sv$BpSeq[i])
-          aln = matchPattern(subseq(seq, 1, bpSeqSize), genome[[as.character(sv$Chr[i])]])
+          aln = matchPattern(subseq(seq, 1, bpSeqSize), genome[[as.character(sv$Chr[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
           s = (end(aln) == sv$End[i])
-          aln = matchPattern(subseq(seq, bpSeqSize+1, bpSeqSize*2), genome[[as.character(sv$Chr[i])]])
+          aln = matchPattern(subseq(seq, bpSeqSize+1, bpSeqSize*2), genome[[as.character(sv$Chr[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
           e = (start(aln) == sv$Start[i])
           ## also test the number of duplication
-          aln = matchPattern(seq, sim[[as.character(sv$Chr[i])]])
+          aln = matchPattern(seq, sim[[as.character(sv$Chr[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
           d = ((length(aln)+1) == sv$Duplications[i])
           iscorrect = c(iscorrect, s & e & d)
         }
@@ -552,37 +668,37 @@ setMethod("compareSV",
           ## case xxx... <-> ...xxx
           if(sv$StartA[i] == 1 & sv$StartB[i] != 1){
             seq1 = reverseComplement(subseq(seq, 1, bpSeqSize))
-            aln = matchPattern(seq1, genome[[as.character(sv$ChrB[i])]])
+            aln = matchPattern(seq1, genome[[as.character(sv$ChrB[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
             s = (start(aln) == sv$StartB[i])
             seq2 = subseq(seq, bpSeqSize+1, bpSeqSize*2)
-            aln = matchPattern(seq2, genome[[as.character(sv$ChrA[i])]])
+            aln = matchPattern(seq2, genome[[as.character(sv$ChrA[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
             e = (end(aln) == sv$EndA[i] + bpSeqSize)
           }
           ## case ...xxx <-> xxx...
           if(sv$StartA[i] != 1 & sv$StartB[i] == 1){
             seq1 = subseq(seq, 1, bpSeqSize)
-            aln = matchPattern(seq1, genome[[as.character(sv$ChrA[i])]])
+            aln = matchPattern(seq1, genome[[as.character(sv$ChrA[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
             s = (start(aln) == sv$StartA[i] - bpSeqSize)
             seq2 = reverseComplement(subseq(seq, bpSeqSize+1, bpSeqSize*2))
-            aln = matchPattern(seq2, genome[[as.character(sv$ChrB[i])]])
+            aln = matchPattern(seq2, genome[[as.character(sv$ChrB[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
             e = (end(aln) == sv$EndB[i])
           }
           ## case xxx... <-> xxx...
           if(sv$StartA[i] == 1 & sv$StartB[i] == 1){
             seq1 = subseq(seq, 1, bpSeqSize)
-            aln = matchPattern(seq1, genome[[as.character(sv$ChrB[i])]])
+            aln = matchPattern(seq1, genome[[as.character(sv$ChrB[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
             s = (end(aln) == sv$EndB[i])
             seq2 = subseq(seq, bpSeqSize+1, bpSeqSize*2)
-            aln = matchPattern(seq2, genome[[as.character(sv$ChrA[i])]])
+            aln = matchPattern(seq2, genome[[as.character(sv$ChrA[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
             e = (end(aln) == (sv$EndA[i] + bpSeqSize))
           }
           ## case ...xxx <-> ...xxx
           if(sv$StartA[i] != 1 & sv$StartB[i] != 1){
             seq1 = subseq(seq, 1, bpSeqSize)
-            aln = matchPattern(seq1, genome[[as.character(sv$ChrA[i])]])
+            aln = matchPattern(seq1, genome[[as.character(sv$ChrA[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
             s = (start(aln) == sv$StartA[i] - bpSeqSize)
             seq2 = subseq(seq, bpSeqSize+1, bpSeqSize*2)
-            aln = matchPattern(seq2, genome[[as.character(sv$ChrB[i])]])
+            aln = matchPattern(seq2, genome[[as.character(sv$ChrB[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
             e = (start(aln) == sv$StartB[i])
           }
           iscorrect = c(iscorrect, s & e)
@@ -593,43 +709,43 @@ setMethod("compareSV",
             ## case xxx... <-> ...xxx
             if(sv$StartA[i] == 1 & sv$StartB[i] != 1){
               seq1 = subseq(seq, 1, bpSeqSize)
-              aln = matchPattern(seq1, genome[[as.character(sv$ChrB[i])]])
+              aln = matchPattern(seq1, genome[[as.character(sv$ChrB[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
               s = (start(aln) == sv$StartB[i] - bpSeqSize)
               seq2 = reverseComplement(subseq(seq, bpSeqSize+1, bpSeqSize*2))
-              aln = matchPattern(seq2, genome[[as.character(sv$ChrA[i])]])
+              aln = matchPattern(seq2, genome[[as.character(sv$ChrA[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
               e = (end(aln) == sv$EndA[i])
             }
             ## case ...xxx <-> xxx...
             if(sv$StartA[i] != 1 & sv$StartB[i] == 1){
               seq1 = reverseComplement(subseq(seq, 1, bpSeqSize))
-              aln = matchPattern(seq1, genome[[as.character(sv$ChrA[i])]])
+              aln = matchPattern(seq1, genome[[as.character(sv$ChrA[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
               s = (start(aln) == sv$StartA[i])
               seq2 = subseq(seq, bpSeqSize+1, bpSeqSize*2)
-              aln = matchPattern(seq2, genome[[as.character(sv$ChrB[i])]])
+              aln = matchPattern(seq2, genome[[as.character(sv$ChrB[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
               e = (end(aln) == sv$EndB[i] + bpSeqSize)
             }
             ## case xxx... <-> xxx...
             if(sv$StartA[i] == 1 & sv$StartB[i] == 1){
               seq1 = subseq(seq, 1, bpSeqSize)
-              aln = matchPattern(seq1, genome[[as.character(sv$ChrA[i])]])
+              aln = matchPattern(seq1, genome[[as.character(sv$ChrA[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
               s = (end(aln) == sv$EndA[i])
               seq2 = subseq(seq, bpSeqSize+1, bpSeqSize*2)
-              aln = matchPattern(seq2, genome[[as.character(sv$ChrB[i])]])
+              aln = matchPattern(seq2, genome[[as.character(sv$ChrB[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
               e = (end(aln) == (sv$EndB[i] + bpSeqSize))
             }
             ## case ...xxx <-> ...xxx
             if(sv$StartA[i] != 1 & sv$StartB[i] != 1){
               seq1 = subseq(seq, 1, bpSeqSize)
-              aln = matchPattern(seq1, genome[[as.character(sv$ChrB[i])]])
+              aln = matchPattern(seq1, genome[[as.character(sv$ChrB[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
               s = (start(aln) == sv$StartB[i] - bpSeqSize)
               seq2 = subseq(seq, bpSeqSize+1, bpSeqSize*2)
-              aln = matchPattern(seq2, genome[[as.character(sv$ChrA[i])]])
+              aln = matchPattern(seq2, genome[[as.character(sv$ChrA[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
               e = (start(aln) == sv$StartA[i])
             }
             iscorrect = c(iscorrect, s & e)
           }else{
             seq = DNAString(sv$BpSeqB[i])
-            aln = matchPattern(seq, genome[[as.character(sv$ChrB[i])]])
+            aln = matchPattern(seq, genome[[as.character(sv$ChrB[i])]], with.indels=TRUE, max.mismatch=maxMismatch)
             s = (start(aln) == (sv$StartB[i] - bpSeqSize)) | (end(aln) == (sv$EndB[i] + bpSeqSize))
             iscorrect = c(iscorrect, s)
           }        
@@ -642,6 +758,3 @@ setMethod("compareSV",
     }   
   }
 }
-  
-
-

@@ -1,11 +1,61 @@
-.execDeletion <- function(genomeSeq, c, posDel, posIns_1, posIns_2, posInv, posDup, posTrans_1, posTrans_2, bpSeqSize, i){
+.addBreakpointMutations <- function(region, percSNPs, indelProb, maxIndelSize){
+
+  regionSize = length(region)
+  adjustBy = 0
+
+  if(regionSize > 3 & percSNPs > 0){
+    ## place SNPs
+    idx = sample(x=c(TRUE,FALSE), size=regionSize, replace=TRUE, prob=c(percSNPs, 1-percSNPs))
+    region = replaceLetterAt(region, idx, sample(x=c("A","C","G","T"), size=sum(idx), replace=TRUE))
+  }
+  
+  if(regionSize > 3 & indelProb > 0){
+    ## place maximum one indel into each region (50/50 if deletion or insertion)
+    type = sample(c("del","ins"), 1)
+    doIndel = sample(c(TRUE, FALSE), 1, prob=c(indelProb, 1-indelProb))
+    if(doIndel & type == "del"){
+      start = sample(1:(regionSize-maxIndelSize), 1)
+      end = start + sample(1:maxIndelSize, 1)-1
+      region = DNAString(paste(subseq(region, 1, start-1), subseq(region, end+1, length(region)), sep=""))
+      adjustBy = adjustBy + (end-start+1)*(-1)
+    }
+    if(doIndel & type == "ins"){
+      pos = sample(1:regionSize, 1)
+      numNuc = sample(1:maxIndelSize, 1)
+      insSeq = paste(sample(c("A","T","G","C"), numNuc, replace=TRUE), collapse="")
+      region = DNAString(paste(subseq(region, 1, pos), insSeq, subseq(region, pos+1, length(region)), sep=""))
+      adjustBy = adjustBy + numNuc
+    }
+  }
+
+  return(list(region, adjustBy))
+
+}
+
+.execDeletion <- function(genomeSeq, c, posDel, posIns_1, posIns_2, posInv, posDup, posTrans_1, posTrans_2, bpSeqSize, i, bpFlankSize, percSNPs, indelProb, maxIndelSize){
   
   pos = posDel[i, ]
   start = as.integer(pos$start)
   end = as.integer(pos$end)
-  genomeSeq = DNAString(paste(subseq(genomeSeq, 1, start-1), subseq(genomeSeq, end+1, length(genomeSeq)), sep=""))
+
+  ## add random mutations (SNPs an/or indels) at the breakpoints flanking regions (5' and 3')
+  ## take care not to exceed the genome limits
+  ## take care to adjust coordinates of other SVs correspondingly
+  sf  = max(1, start-bpFlankSize)
+  ef = min(length(genomeSeq), end+bpFlankSize)
+  flankingRegion1 = subseq(genomeSeq, sf, start-1)
+  flankingRegion2 = subseq(genomeSeq, end+1, ef)
+  flankingRegion1 = .addBreakpointMutations(flankingRegion1, percSNPs, indelProb, maxIndelSize)
+  adjustBy = flankingRegion1[[2]]
+  flankingRegion1 = flankingRegion1[[1]]
+  flankingRegion2 = .addBreakpointMutations(flankingRegion2, percSNPs, indelProb, maxIndelSize)
+  adjustBy = adjustBy + flankingRegion2[[2]]
+  flankingRegion2 = flankingRegion2[[1]]
   
-  adjustBy = (end-start+1)*-1 # adjust positions by deletion size
+  ## paste genome: fist part of chromosome - flanking bp region (5') - deleted region - flanking bp region (3') - rest of the chromosome
+  genomeSeq = DNAString(paste(subseq(genomeSeq, 1, sf-1), flankingRegion1, flankingRegion2, subseq(genomeSeq, ef+1, length(genomeSeq)), sep=""))
+  
+  adjustBy = adjustBy + (end-start+1)*-1 # adjust positions by deletion size
   posDel = .adjustPositions(posDel, c, end, adjustBy)
   posIns_1= .adjustPositions(posIns_1, c, end, adjustBy)
   posIns_2= .adjustPositions(posIns_2, c, end, adjustBy)
@@ -17,7 +67,7 @@
   return(list(genomeSeq, posDel, posIns_1, posIns_2, posInv, posDup, posTrans_1, posTrans_2))
 }
 
-.execInsertion <- function(genomeSeqA, genomeSeqB, c1, c2, posDel, posIns_1, posIns_2, posInv, posDup, posTrans_1, posTrans_2, i, bpSeqSize){
+.execInsertion <- function(genomeSeqA, genomeSeqB, c1, c2, posDel, posIns_1, posIns_2, posInv, posDup, posTrans_1, posTrans_2, i, bpSeqSize, bpFlankSize, percSNPs, indelProb, maxIndelSize){
   
   ## chrA
   pos = posIns_1[i, ]
@@ -30,10 +80,24 @@
   if(copied == TRUE){
     ## nothing to do in this case
   }else{
-    genomeSeqA = DNAString(paste(subseq(genomeSeqA, 1, startA-1), subseq(genomeSeqA, endA+1, length(genomeSeqA)), sep=""))
+    ## add random mutations (SNPs an/or indels) at the breakpoints flanking regions (5' and 3')
+    ## take care not to exceed the genome limits
+    ## take care to adjust coordinates of other SVs correspondingly
+    sf  = max(1, startA-bpFlankSize)
+    ef = min(length(genomeSeqA), endA+bpFlankSize)
+    flankingRegion1 = subseq(genomeSeqA, sf, startA-1)
+    flankingRegion2 = subseq(genomeSeqA, endA+1, ef)
+    flankingRegion1 = .addBreakpointMutations(flankingRegion1, percSNPs, indelProb, maxIndelSize)
+    adjustBy = flankingRegion1[[2]]
+    flankingRegion1 = flankingRegion1[[1]]
+    flankingRegion2 = .addBreakpointMutations(flankingRegion2, percSNPs, indelProb, maxIndelSize)
+    adjustBy = adjustBy + flankingRegion2[[2]]
+    flankingRegion2 = flankingRegion2[[1]]
+    
+    genomeSeqA = DNAString(paste(subseq(genomeSeqA, 1, sf-1), flankingRegion1, flankingRegion2, subseq(genomeSeqA, ef+1, length(genomeSeqA)), sep=""))
     ## adjust coordinates downstream of insertion
     ## (take care, that the end of ins1 is adjusted as well!)
-    adjustBy = (endA-startA+1) * -1
+    adjustBy = adjustBy + (endA-startA+1) * -1
     posIns_1$end[i] = posIns_1$start[i]
     posDel = .adjustPositions(posDel, c1, endA, adjustBy)
     posIns_1 = .adjustPositions(posIns_1, c1, endA, adjustBy)
@@ -48,10 +112,25 @@
   pos = posIns_2[i, ]
   startB = as.integer(pos$start)
   endB = as.integer(pos$end)
-  genomeSeqB = DNAString(paste(subseq(genomeSeqB, 1, startB-1), insSeq, subseq(genomeSeqB, startB, length(genomeSeqB)), sep=""))
+
+  ## add random mutations (SNPs an/or indels) at the breakpoints flanking regions (5' and 3')
+  ## take care not to exceed the genome limits
+  ## take care to adjust coordinates of other SVs correspondingly
+  sf  = max(1, startB-bpFlankSize)
+  ef = min(length(genomeSeqB), startB+bpFlankSize-1)
+  flankingRegion1 = subseq(genomeSeqB, sf, startB-1)
+  flankingRegion2 = subseq(genomeSeqB, startB, ef)
+  flankingRegion1 = .addBreakpointMutations(flankingRegion1, percSNPs, indelProb, maxIndelSize)
+  adjustBy = flankingRegion1[[2]]
+  flankingRegion1 = flankingRegion1[[1]]
+  flankingRegion2 = .addBreakpointMutations(flankingRegion2, percSNPs, indelProb, maxIndelSize)
+  adjustBy = adjustBy + flankingRegion2[[2]]
+  flankingRegion2 = flankingRegion2[[1]]
+  
+  genomeSeqB = DNAString(paste(subseq(genomeSeqB, 1, sf-1),flankingRegion1, insSeq, flankingRegion2, subseq(genomeSeqB, ef+1, length(genomeSeqB)), sep=""))
     
   ## adjust coordinates downstream of insertion
-  adjustBy = endA-startA+1
+  adjustBy = adjustBy + endA-startA+1
   posDel = .adjustPositions(posDel, c2, endB, adjustBy)
   posIns_1 = .adjustPositions(posIns_1, c2, endB, adjustBy)
   posIns_2 = .adjustPositions(posIns_2, c2, endB, adjustBy)
@@ -63,28 +142,67 @@
   return(list(genomeSeqA, genomeSeqB, posDel, posIns_1, posIns_2, posInv, posDup, posTrans_1, posTrans_2))
 }
 
-.execInversion <- function(genomeSeq, posInv, bpSeqSize, i){
+.execInversion <- function(genomeSeq, c, posDel, posIns_1, posIns_2, posInv, posDup, posTrans_1, posTrans_2, bpSeqSize, i, bpFlankSize, percSNPs, indelProb, maxIndelSize){
   
   pos = posInv[i, ]
   start = as.integer(pos$start)
   end = as.integer(pos$end)
+
+  ## add random mutations (SNPs an/or indels) at the breakpoints flanking regions (5' and 3')
+  ## take care not to exceed the genome limits
+  ## take care to adjust coordinates of other SVs correspondingly
+  sf  = max(1, start-bpFlankSize)
+  ef = min(length(genomeSeq), end+bpFlankSize)
+  flankingRegion1 = subseq(genomeSeq, sf, start-1)
+  flankingRegion2 = subseq(genomeSeq, end+1, ef)
+  flankingRegion1 = .addBreakpointMutations(flankingRegion1, percSNPs, indelProb, maxIndelSize)
+  adjustBy = flankingRegion1[[2]]
+  flankingRegion1 = flankingRegion1[[1]]
+  flankingRegion2 = .addBreakpointMutations(flankingRegion2, percSNPs, indelProb, maxIndelSize)
+  adjustBy = adjustBy + flankingRegion2[[2]]
+  flankingRegion2 = flankingRegion2[[1]]
+
   invertedSeq = reverseComplement(subseq(genomeSeq, start, end))
-  genomeSeq = DNAString(paste(subseq(genomeSeq, 1, start-1), invertedSeq, subseq(genomeSeq, end+1, length(genomeSeq)), sep=""))
-  return(genomeSeq)
+  genomeSeq = DNAString(paste(subseq(genomeSeq, 1, sf-1), flankingRegion1, invertedSeq, flankingRegion2, subseq(genomeSeq, ef+1, length(genomeSeq)), sep=""))
+
+  posDel = .adjustPositions(posDel, c, end, adjustBy)
+  posIns_1= .adjustPositions(posIns_1, c, end, adjustBy)
+  posIns_2= .adjustPositions(posIns_2, c, end, adjustBy)
+  posInv = .adjustPositions(posInv, c, end, adjustBy)
+  posDup = .adjustPositions(posDup, c, end, adjustBy)
+  posTrans_1 = .adjustPositions(posTrans_1, c, end, adjustBy)
+  posTrans_2 = .adjustPositions(posTrans_2, c, end, adjustBy)
+
+  return(list(genomeSeq, posDel, posIns_1, posIns_2, posInv, posDup, posTrans_1, posTrans_2))
 }
 
-.execTandemDuplication <- function(genomeSeq, c, posDel, posIns_1, posIns_2, posInv, posDup, posTrans_1, posTrans_2, bpSeqSize, times, i){
+.execTandemDuplication <- function(genomeSeq, c, posDel, posIns_1, posIns_2, posInv, posDup, posTrans_1, posTrans_2, bpSeqSize, times, i, bpFlankSize, percSNPs, indelProb, maxIndelSize){
   
   pos = posDup[i, ]
   start = as.integer(pos$start)
   end = as.integer(pos$end)
+
+  ## add random mutations (SNPs an/or indels) at the breakpoints flanking regions (5' and 3')
+  ## take care not to exceed the genome limits
+  ## take care to adjust coordinates of other SVs correspondingly
+  sf  = max(1, start-bpFlankSize)
+  ef = min(length(genomeSeq), end+bpFlankSize)
+  flankingRegion1 = subseq(genomeSeq, sf, start-1)
+  flankingRegion2 = subseq(genomeSeq, end+1, ef)
+  flankingRegion1 = .addBreakpointMutations(flankingRegion1, percSNPs, indelProb, maxIndelSize)
+  adjustBy = flankingRegion1[[2]]
+  flankingRegion1 = flankingRegion1[[1]]
+  flankingRegion2 = .addBreakpointMutations(flankingRegion2, percSNPs, indelProb, maxIndelSize)
+  adjustBy = adjustBy + flankingRegion2[[2]]
+  flankingRegion2 = flankingRegion2[[1]]
+
   s = min(end-start+1, bpSeqSize)
   bpSeq = paste(subseq(genomeSeq, end-s+1, end), subseq(genomeSeq, start, start+s-1), sep="")
   dupSeq = subseq(genomeSeq, start, end)
   dupSeq = paste(rep(dupSeq, times), collapse="")
-  genomeSeq = DNAString(paste(subseq(genomeSeq, 1, start-1), dupSeq, subseq(genomeSeq, end+1, length(genomeSeq)), sep=""))
+  genomeSeq = DNAString(paste(subseq(genomeSeq, 1, sf-1), flankingRegion1, dupSeq, flankingRegion2, subseq(genomeSeq, ef+1, length(genomeSeq)), sep=""))
   
-  adjustBy = (end-start+1)*(times-1) # adjust positions by length of additional sequence
+  adjustBy = adjustBy + (end-start+1)*(times-1) # adjust positions by length of additional sequence
   posDel = .adjustPositions(posDel, c, end, adjustBy)
   posIns_1= .adjustPositions(posIns_1, c, end, adjustBy)
   posIns_2= .adjustPositions(posIns_2, c, end, adjustBy)
@@ -96,7 +214,7 @@
   return(list(genomeSeq, posDel, posIns_1, posIns_2, posInv, posDup, posTrans_1, posTrans_2, bpSeq))
 }
 
-.execTranslocation <- function(genomeSeqA, genomeSeqB, c1, c2, posDel, posIns_1, posIns_2, posInv, posDup, posTrans_1, posTrans_2, i, bpSeqSize, transInsert){
+.execTranslocation <- function(genomeSeqA, genomeSeqB, c1, c2, posDel, posIns_1, posIns_2, posInv, posDup, posTrans_1, posTrans_2, i, bpSeqSize, bpFlankSize, percSNPs, indelProb, maxIndelSize){
   
   ## chrA
   pos = posTrans_1[i, ]
@@ -119,26 +237,26 @@
   }
   
   ## chrA ----> chrB
-  ## add 0-transInsert random nucleotides at each breakpoint
-  if(startB == 1 | transInsert < 1){
-    numNuc1 = 0
-  }else{
-    numNuc1 = sample(1:transInsert, 1)
-  }
-  bpInsSeq1 = paste(sample(c("A","T","G","C"), numNuc1, replace=TRUE), collapse="")
-  if(endB == length(genomeSeqB) | transInsert < 1){
-    numNuc2 = 0
-  }else{
-    numNuc2 = sample(1:transInsert, 1)
-  }
-  bpInsSeq2 = paste(sample(c("A","T","G","C"), numNuc2, replace=TRUE), collapse="")
-  transSeqA = DNAString(paste(bpInsSeq1, transSeqA, bpInsSeq2, sep=""))
   
-  genomeSeqB = DNAString(paste(subseq(genomeSeqB, 1, startB-1), transSeqA, subseq(genomeSeqB, endB+1, length(genomeSeqB)), sep=""))  
+  ## add random mutations (SNPs an/or indels) at the breakpoints flanking regions (5' and 3')
+  ## take care not to exceed the genome limits
+  ## take care to adjust coordinates of other SVs correspondingly
+  sf  = max(1, startB-bpFlankSize)
+  ef = min(length(genomeSeqB), endB+bpFlankSize)
+  flankingRegion1 = subseq(genomeSeqB, sf, startB-1)
+  flankingRegion2 = subseq(genomeSeqB, endB+1, ef)
+  flankingRegion1 = .addBreakpointMutations(flankingRegion1, percSNPs, indelProb, maxIndelSize)
+  adjustBy = flankingRegion1[[2]]
+  flankingRegion1 = flankingRegion1[[1]]
+  flankingRegion2 = .addBreakpointMutations(flankingRegion2, percSNPs, indelProb, maxIndelSize)
+  adjustBy = adjustBy + flankingRegion2[[2]]
+  flankingRegion2 = flankingRegion2[[1]]
+ 
+  genomeSeqB = DNAString(paste(subseq(genomeSeqB, 1, sf-1), flankingRegion1, transSeqA, flankingRegion2, subseq(genomeSeqB, ef+1, length(genomeSeqB)), sep=""))  
   
   ## adjust coordinates downstream of translocation
   ## (take care, that the end of trans1 is adjusted as well!)
-  adjustBy = (endA-startA+1) - (endB-startB+1) + numNuc1 + numNuc2
+  adjustBy = adjustBy + (endA-startA+1) - (endB-startB+1)
   posTrans_2$end[i] = posTrans_2$end[i] + adjustBy
   posDel = .adjustPositions(posDel, c2, endB, adjustBy)
   posIns_1 = .adjustPositions(posIns_1, c2, endB, adjustBy)
@@ -153,25 +271,25 @@
   endA = as.integer(posTrans_1$end[i])
  
   if(balanced == TRUE){
-    ## add 0-transInsert random nucleotides at each breakpoint
-    if(startA == 1 | transInsert < 1){
-      numNuc1 = 0
-    }else{
-      numNuc1 = sample(1:transInsert, 1)
-    }
-    bpInsSeq1 = paste(sample(c("A","T","G","C"), numNuc1, replace=TRUE), collapse="")
-    if(endA == length(genomeSeqA) | transInsert < 1){
-      numNuc2 = 0
-    }else{
-      numNuc2 = sample(1:transInsert, 1)
-    }
-    bpInsSeq2 = paste(sample(c("A","T","G","C"), numNuc2, replace=TRUE), collapse="")
-    transSeqB = DNAString(paste(bpInsSeq1, transSeqB, bpInsSeq2, sep=""))
 
-    genomeSeqA = DNAString(paste(subseq(genomeSeqA, 1, startA-1), transSeqB, subseq(genomeSeqA, endA+1, length(genomeSeqA)), sep=""))
+    ## add random mutations (SNPs an/or indels) at the breakpoints flanking regions (5' and 3')
+    ## take care not to exceed the genome limits
+    ## take care to adjust coordinates of other SVs correspondingly
+    sf  = max(1, startA-bpFlankSize)
+    ef = min(length(genomeSeqA), endA+bpFlankSize)
+    flankingRegion1 = subseq(genomeSeqA, sf, startA-1)
+    flankingRegion2 = subseq(genomeSeqA, endA+1, ef)
+    flankingRegion1 = .addBreakpointMutations(flankingRegion1, percSNPs, indelProb, maxIndelSize)
+    adjustBy = flankingRegion1[[2]]
+    flankingRegion1 = flankingRegion1[[1]]
+    flankingRegion2 = .addBreakpointMutations(flankingRegion2, percSNPs, indelProb, maxIndelSize)
+    adjustBy = adjustBy + flankingRegion2[[2]]
+    flankingRegion2 = flankingRegion2[[1]]
+    
+    genomeSeqA = DNAString(paste(subseq(genomeSeqA, 1, sf-1), flankingRegion1, transSeqB, flankingRegion2, subseq(genomeSeqA, ef+1, length(genomeSeqA)), sep=""))
     
     ## adjust coordinates downstream of balanced translocation
-    adjustBy = (endB-startB+1) - (endA-startA+1) + numNuc1 + numNuc2
+    adjustBy = adjustBy + (endB-startB+1) - (endA-startA+1)
   ## if not balanced: chrA <--NOT-- chrB
   }else{
     ## code for deleting the segment
