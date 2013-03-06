@@ -33,8 +33,8 @@
   \item{percCopiedIns}{Percentage of copy-and-paste-like insertions (default: 0, i.e. no inserted sequences are duplicated)}
   \item{percBalancedTrans}{Percentage of balanced translocations (default: 1, i.e. all translocations are balanced)}
   \item{bpFlankSize}{Size of the each breakpoint's flanking regions, which may contain additional SNPs and/or indels}
-  \item{percSNPs}{Percentage of SNPs within a breakpoint flanking region}
-  \item{indelProb}{Probability for an indel within a breakpoint flanking region}
+  \item{percSNPs}{Percentage of SNPs within a breakpoint's flanking region}
+  \item{indelProb}{Probability for an indel within a breakpoint's flanking region}
   \item{maxIndelSize}{Maximum size of an indel}
   \item{repeatBias}{If TRUE, the breakpoint positioning is biased towards repeat regions instead of a uniform distribution; turned off by default (see details below)}
   \item{weightsMechanisms}{Weights for SV formation mechanisms (see details and examples below)}
@@ -64,8 +64,8 @@
   }
   About biases towards SV formation mechanisms and repeat regions:
   \itemize{
-    \item When using the default genome hg19 and setting \code{repeatBias=TRUE}, RSVSim simulates a bias of breakpoint positioning towards certain kinds of repeat regions and regions of high homology. For \code{repeatBias=FALSE} (the default), the breakpoints will be placed uniformly across the whole genome.
-    \item This is done in two steps: 1. Weighting SV formation mechanisms (here: NAHR, NHR, VNTR, TEI, Other) for each SV type. 2. Weighting each SV formation mechanism for each kind of repeat (supported: LINE/L1, LINE/L2, SINE/Alu, SINE/MIR, segmental duplications (SD), tandem repeats (TR), Random). The default weights were chosen from studies with SVs >1.000bp by Mills et al., Pang et al., Ou et al. and Hu et al. It is possible to change these weights by using the arguments weightsMechanisms and weightsRepeats, which need to have a given data.frame structure (see vignette and examples below for details).
+    \item When using the default genome hg19 and setting \code{repeatBias=TRUE}, RSVSim simulates a bias of breakpoint positioning towards certain kinds of repeat regions and regions of high homology. If \code{repeatBias=FALSE} (the default), the breakpoints will be placed uniformly across the whole genome.
+    \item This is done in two steps: 1. Weighting SV formation mechanisms (here: NAHR, NHR, VNTR, TEI, Other) for each SV type. 2. Weighting each SV formation mechanism for each kind of repeat (supported: LINE/L1, LINE/L2, SINE/Alu, SINE/MIR, segmental duplications (SD), tandem repeats (TR), Random). The default weights were chosen from studies with SVs >1.000bp by Mills et al., Pang et al., Ou et al. and Hu et al. It is possible to change these weights by using the arguments weightsMechanisms and weightsRepeats, which need to have a certain data.frame structure (see vignette and examples below for details).
     \item For mechanisms NAHR and NHR, SV breakpoints will be placed close to repeat regions (no overlap). For VNTR, TEI and Other, the breakpoints lie within the repeats.
     \item This feature requires the coordinates of repeat regions for hg19. This can be handled in two ways: 1. When using this feature the first time, RSVSim downloads the coordinates once automatically from the UCSC Browser's RepeatMasker track (which may take up to 45 Minutes!) 2. The user may specify the filename of a RepeatMasker output file downloaded from their homepage: http://www.repeatmasker.org/species/homSap.html (e.g. hg19.fa.out.gz). In both cases, RSVSim saves the coordinates as RData object to the RSVSim installation directory for a faster access in the future.
     \item This feature is turned off automatically, when the user specifies his own genome. Then, breakpoints will be placed uniformly across the genome. 

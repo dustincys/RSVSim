@@ -74,7 +74,8 @@ setMethod("simulateSV",
   ## for simulation on hg19 set the weights for the repeat elements (if not given by the user)
   ## for simulation on any other organism (user specified genome), set the weights to zero except for random simulation (i.e. turn this feature off)
   if(missing(weightsMechanisms) & genomeOrganism == "hg19" & repeatBias){
-    data("weightsMechanism")
+    weightsMechanism = NULL
+    data("weightsMechanism")   ## TODO: no good programming style here: weightsMechanism.Rd holds data for variable weightsMechanisms (naming both the same gives an error)
     weightsMechanisms = weightsMechanism
   }else{
     weightsMechanisms = data.frame(
@@ -87,7 +88,8 @@ setMethod("simulateSV",
     rownames(weightsMechanisms) = mechanisms
   }  
   if(missing(weightsRepeats) & genomeOrganism == "hg19" & repeatBias){
-    data("weightsRepeat")
+    weightsRepeat = NULL
+    data("weightsRepeat")  ##TODO: same as above
     weightsRepeats = weightsRepeat
   }else{
     weightsRepeats = data.frame(
