@@ -167,17 +167,17 @@ Using the default genome hg19 and setting \Rfunarg{repeatBias} to \Rcode{TRUE}, 
 For the mechanisms NAHR and NHR, SV breakpoints will be placed next to the repeat regions (no overlap). For VNTR, TEI and Other, the breakpoints lie within the repeats. \\ This feature is turned off automatically, when the user specifies his own genome (i.e. any genome other than hg19). \\
 The default weights for SV mechanisms for deletions, insertions an duplications are based on figure 4b in \cite{1000genomes}. The weights for inversions refer to figure 3c in \cite{svformation2}. The mechanisms and breakpoint sequences of translocations have not been studied as extensively as for other kinds of SVs. The default weights for translocations were chosen according to some exemplary publications (\cite{svformation3}, \cite{svformation4}), so that NAHR, NHR and random breakpoint positioning contribute equally. In all cases, the results for SVs $>$1.000bp were used. The exact weights are:
 <<label=weightsMechanisms, eval=TRUE, echo=FALSE, hide=FALSE>>=
-data(weightsMechanism)
-show(weightsMechanism)
+data(weightsMechanisms, package="RSVSim")
+show(weightsMechanisms)
 @
 The default weights for repeat regions for every SV mechanism were based on the enrichment analysis in \cite{svformation1} (see their supplemental table 5). The exact values are:
 <<label=weightsRepeats, eval=TRUE, echo=TRUE, hide=FALSE>>=
-data(weightsRepeat)
-show(weightsRepeat)
+data(weightsRepeats, package="RSVSim")
+show(weightsRepeats)
 @
 The user may provide other weights by passing his own \Rcode{data.frames}, using the function arguments \Rfunarg{weightsMechanisms} and \Rfunarg{weightsRepeats}. The structure of the \Rcode{data.frames} has to be identical to the default ones shown above (i.e. same dimensions, column and row names). The effect of the weights is comparable to the \Rfunarg{prob} argument in the R function \Rfunction{sample}. \\
 For example
-<<label=weightsExample, eval=FALSE, echo=TRUE, hide=FALSE>>=
+<<label=weightsExample, eval=FALSE, echo=FALSE, hide=FALSE>>=
 weightsRepeats = data.frame(
   NAHR = c(0,0,3,1,0,0,0),
   NHR = c(1.04,0.62,1.16,0,2.06,0,0),
@@ -196,7 +196,7 @@ This feature requires the coordinates of repeat regions for hg19. This can be ha
   \item \Rpackage{RSVSim} downloads the coordinates once automatically from the UCSC Browser's RepeatMasker track (which may take up to 45 Minutes!).
   \item The user may specify the filename of a RepeatMasker output file downloaded from their homepage (\cite{repeatmasker}): http://www.repeatmasker.org/species/homSap.html (e.g. hg19.fa.out.gz). Loading this file takes only a few minutes.
 \end{itemize}
-In both cases, RSVSim saves the coordinates as \Rcode{RData} object \Rcode{repeats\_hg19.RData} to the RSVSim installation directory for a faster access in the future (if write privileges allow to do so). Then, one of the two steps mentioned above is not necessary anymore and \Rpackage{RSVSim} loads the coordinates automatically from the \Rcode{RData} file.
+In both cases, RSVSim saves the coordinates as \Rcode{RData} object \Rcode{repeats\_hg19.RData} to the RSVSim installation directory for a faster access in the future (if write privileges allow to do so). After that, one of the two steps mentioned above is not necessary anymore and next time, \Rpackage{RSVSim} is going to load the coordinates automatically from the \Rcode{RData} file.
 
 \section{Simulation of additional breakpoint mutations}
 SV breakpoints are usually not clean but tend to co-occur with other, usually smaller mutations, such as indels or SNPs. \Rpackage{RSVSim} allows to randomly generate additional SNPs and indels within the flanking regions of each breakpoint. Their generation can be configured by the four arguments \Rfunarg{bpFlankSize}, \Rfunarg{percSNPs}, \Rfunarg{indelProb} and \Rfunarg{maxIndelSize}, which specify the size of the flanking regions in bp (i.e. proximity of the mutations to the breakpoint), the fraction on SNPs (in \%), the probability of an indel (insertions and deletions are equally likely) and the maximum size of an indel (size is selected randomly between 1 and \Rfunarg{maxIndelSize}). Each flanking region may only contain one indel. SNPs can affect 0-100\% of the region. By default, this feature is turned off. \\

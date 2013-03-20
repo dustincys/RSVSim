@@ -2,44 +2,73 @@
 
 .drawPos <- function(chr, bpRegionsList, weightsMechanisms, weightsRepeats, size){
 
+  bpRegions = NULL
+  sampleChr = FALSE
+  chrs = seqlevels(bpRegionsList[["Random"]])
+  ## a chromosome can be given (for translocations and insertions) or sampled randomly when set to NA (other SVs)
+  if(is.na(chr)){
+    sampleChr = TRUE
+  }
+    
   ## sample mechanism
-  idx = weightsMechanisms[,1] > 0
+  idx = weightsMechanisms[,1] > 0  # col-index is 1, because main function already passed the right subset of weights
   mechanism = sample(rownames(weightsMechanisms)[idx], 1, prob=weightsMechanisms[idx,1])
+  weightsRepeats = weightsRepeats[, mechanism, drop=FALSE]
   ## sample region type (kind of repeat or any other region)
-  idx = weightsRepeats[, mechanism] > 0
-  regionType = sample(rownames(weightsRepeats[, mechanism, drop=FALSE])[idx], 1, prob=weightsRepeats[idx, mechanism])
+  idx = weightsRepeats > 0
+  regionType = sample(rownames(weightsRepeats)[idx], 1, prob=weightsRepeats[idx, 1])
   
-  bpRegions = bpRegionsList[[regionType]]
-  bpRegions = bpRegions[seqnames(bpRegions) == chr]
-  
-  ## for NAHR and NHR use the flanking regions of repeats
-  ## select flanking regions of the size of the SV
-  ## make sure the flanking regions overlap with valid "normal" regions
-  if(mechanism %in% c("NAHR", "NHR") & regionType != "Random"){
-    ## random distance to the repeats (0-10bp)
-    dist1 = sample(0:10, length(bpRegions), replace=TRUE)
-    dist2 = sample(0:10, length(bpRegions), replace=TRUE)
-    flanks = c(flank(x=bpRegions+dist1, width=size, start=TRUE), flank(x=bpRegions+dist2, width=size, start=FALSE))
-    bpRegions = flanks[queryHits(findOverlaps(flanks, bpRegionsList[["Random"]], type="within"))]
-  }
-  ## for TEI and VNTR use the regions itself
-  ## but make sure they are large enough by extending the regions at the start or end (randomly)
-  if(mechanism %in% c("TEI", "VNTR") & regionType != "Random"){
-    tooSmall = width(bpRegions) < size
-    extendStart = sample(c(TRUE,FALSE), length(bpRegions), replace=TRUE)
-    diff = size - width(bpRegions)
-    start(bpRegions[tooSmall&extendStart]) = start(bpRegions[tooSmall&extendStart]) - diff[tooSmall&extendStart]
-    end(bpRegions[tooSmall&!extendStart]) = end(bpRegions[tooSmall&!extendStart]) + diff[tooSmall&!extendStart]    
-    bpRegions = bpRegions[queryHits(findOverlaps(bpRegions, bpRegionsList[["Random"]], type="within"))]
-  }
-  ## for any other "normal" mechanism and region just use the regions itself
-  ## select only those which are large enough
-  if(mechanism == "Other" | regionType == "Random"){
-    bpRegions = bpRegions[width(bpRegions) >= size]
+  ## while loop in case there no suitable bpregion can be found within any chromosome
+  while(length(bpRegions) == 0 & length(chrs) > 0){
+
+    ## sample chromosome if it is missing; larger chromosomes have a higher probability
+    if(sampleChr == TRUE){
+      probs = sapply(chrs, function(x){return(sum(width(bpRegionsList[["Random"]][seqnames(bpRegionsList[["Random"]]) == x])))})
+      chr = sample(chrs, 1, prob=probs)
+      chrs = chrs[chrs != chr]
+    }
+    
+    bpRegions = bpRegionsList[[regionType]]
+    bpRegions = bpRegions[seqnames(bpRegions) == chr]
+
+    ## for NAHR, set the breakpoints within a repeat (plus some tolerance towards the repeat margins)
+    ## make sure the regions do not overlap with valid "normal" regions
+    if(mechanism == "NAHR" & regionType != "Random"){
+      tol = 50
+      bpRegions = bpRegions[width(bpRegions) >= size+(tol*2)]
+      if(length(bpRegions) > 0){
+        bpRegions = bpRegions - tol # tolerance to make sure, that breakpoints lie not too close to the repeat margins
+        bpRegions = bpRegions[queryHits(findOverlaps(bpRegions, bpRegionsList[["Random"]], type="within"))]
+      }
+    }
+    ## for NHR, TEI and VNTR set one of both breakpoints within the repeats
+    ## but make sure they are large enough by extending the regions at the start or end (randomly)
+    if((length(bpRegions) == 0 | mechanism %in% c("NHR", "TEI", "VNTR")) & regionType != "Random"){
+      tol = 50
+      tooSmall = width(bpRegions) < (size + tol)
+      extendStart = sample(c(TRUE,FALSE), length(bpRegions), replace=TRUE)
+      diff = size - width(bpRegions) + tol # plus some tolerance (50bp)
+      start(bpRegions[tooSmall&extendStart]) = start(bpRegions[tooSmall&extendStart]) - diff[tooSmall&extendStart]
+      end(bpRegions[tooSmall&!extendStart]) = end(bpRegions[tooSmall&!extendStart]) + diff[tooSmall&!extendStart]    
+      bpRegions = bpRegions[queryHits(findOverlaps(bpRegions, bpRegionsList[["Random"]], type="within"))]
+    }
+    ## for any other "normal" mechanism and region just use the regions itself
+    ## select only those which are large enough
+    if(mechanism == "Other" | regionType == "Random"){
+      bpRegions = bpRegions[width(bpRegions) >= size]
+    }
+    
+    ## in case there is no repeat region large enough, try another chromosome or set the breakpoint randomly (of only one left)
+    if(length(bpRegions) == 0){
+      if(length(chrs) == 1){
+        regionType = "Random"
+      }
+    }
   }
 
+  ## abort, if there is no regions large enough for this SV, no matter which mechanism you choose
   if(length(bpRegions) == 0){
-    stop("There is no region large enough for SV of size ", size, "bp")
+    stop("Sorry, not possible to find a spot on the genome, which is large enough for SV of size ", size, "bp")
   }
     
   ## randomly select a region (larger regions have higher probability)
@@ -233,12 +262,8 @@
   if(n > 0){
     if(verbose==TRUE) pb = txtProgressBar(min = 0, max = n, style = 3)
     for(i in 1:n){      
-      ## sample chromosome; larger chromosomes have a higher probability
-      chrs = seqlevels(bpRegionsList[["Random"]])
-      probs = sapply(chrs, function(x){return(sum(width(bpRegionsList[["Random"]][seqnames(bpRegionsList[["Random"]]) == x])))})
-      chr = sample(chrs, 1, prob=probs)
-
-      p = .drawPos(chr, bpRegionsList, weightsMechanisms, weightsRepeats, sizes[i])
+ 
+      p = .drawPos(NA, bpRegionsList, weightsMechanisms, weightsRepeats, sizes[i])
       pos = rbind(pos, p)    
       bpRegionsList[["Random"]] = .subtractIntervals(bpRegionsList[["Random"]], GRanges(IRanges(p$start, p$end), seqnames=p$seqnames))
       if(verbose==TRUE) setTxtProgressBar(pb, i)

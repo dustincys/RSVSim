@@ -74,9 +74,7 @@ setMethod("simulateSV",
   ## for simulation on hg19 set the weights for the repeat elements (if not given by the user)
   ## for simulation on any other organism (user specified genome), set the weights to zero except for random simulation (i.e. turn this feature off)
   if(missing(weightsMechanisms) & genomeOrganism == "hg19" & repeatBias){
-    weightsMechanism = NULL
-    data("weightsMechanism")   ## TODO: no good programming style here: weightsMechanism.Rd holds data for variable weightsMechanisms (naming both the same gives an error)
-    weightsMechanisms = weightsMechanism
+    data("weightsMechanisms", package="RSVSim", envir=environment())
   }else{
     weightsMechanisms = data.frame(
       dels = c(0,0,0,0,1),
@@ -88,9 +86,7 @@ setMethod("simulateSV",
     rownames(weightsMechanisms) = mechanisms
   }  
   if(missing(weightsRepeats) & genomeOrganism == "hg19" & repeatBias){
-    weightsRepeat = NULL
-    data("weightsRepeat")  ##TODO: same as above
-    weightsRepeats = weightsRepeat
+    data("weightsRepeats", package="RSVSim", envir=environment())  ##TODO: same as above
   }else{
     weightsRepeats = data.frame(
       NAHR = c(0,0,0,0,0,0,0),
@@ -117,11 +113,9 @@ setMethod("simulateSV",
     if(verbose==TRUE) message("Bias for hg19 repeat regions is turned ON")
     ## 2. repeatMasker regions were loaded and saved to disk once befoe in the data directory of the package
     ## then just load the data
-    if(
-       file.exists(file.path(path.package("RSVSim"), "data", "repeats_hg19.RData"))
-       ){
+    if(file.exists(file.path(path.package("RSVSim"), "data", "repeats_hg19.RData"))){
       if(verbose==TRUE) message("Loading hg19 repeat regions")
-      data("repeats_hg19")  ## loads object named "repeats"
+      data("repeats_hg19", package="RSVSim", envir=environment())  ## loads object named "repeats"
     }else{
       ## 3. filename of repeatmasker file is given (file downloaded from http://www.repeatmasker.org/genomes/hg19/RepeatMasker-rm330-db20120124/hg19.fa.out.gz)
       ## then, read the file, extract LINES,SINES and read segmental duplications from UCSC
@@ -129,7 +123,7 @@ setMethod("simulateSV",
         if(verbose==TRUE) message("Loading hg19 repeat regions for the first time from given RepeatMasker output file")
         repeats = .readRepeatMaskerOutput(repeatMaskerFile)
         if(file.exists(file.path(path.package("RSVSim"), "data", "repeats_hg19.RData"))){
-         if(verbose==TRUE)  message("Repeat regions were saved to ", file.path(path.package("RSVSim"), "data", "repeats_hg19.RData"), " for faster access in the future")
+         if(verbose==TRUE)  message("Repeat regions were saved to ", file.path(path.package("RSVSim"), "data", "repeats_hg19.RData"), " for faster access next time")
         }else{
           warning("Saving of repeat regions to ", file.path(path.package("RSVSim"), "data", "repeats_hg19.RData"), " failed")
         }
@@ -140,16 +134,18 @@ setMethod("simulateSV",
         if(verbose==TRUE) message("Loading hg19 repeat regions for the first time from the UCSC Browser's RepeatMasker track (this may take up to 45 minutes)")
         repeats = .loadFromUCSC_RepeatMasks(save=TRUE, verbose=verbose)  
         if(file.exists(file.path(path.package("RSVSim"), "data", "repeats_hg19.RData"))){
-         if(verbose==TRUE)  message("Repeat regions were saved to ", file.path(path.package("RSVSim"), "data", "repeats_hg19.RData"), " for faster access in the future")
+         if(verbose==TRUE)  message("Repeat regions were saved to ", file.path(path.package("RSVSim"), "data", "repeats_hg19.RData"), " for faster access next time")
         }else{
           warning("Saving of repeat regions to ", file.path(path.package("RSVSim"), "data", "repeats_hg19.RData"), " failed")
         }
       }
     }
     repeats = lapply(repeats, function(r) return(r[seqnames(r) %in% chrs]))
+    repeats = lapply(repeats, function(r) return(reduce(r, min.gapwidth=100)))  # merge repeats which are only 100bp away from each other
     bpRegions = vector(mode="list", length=length(repeats)+1)
     names(bpRegions) = bpTypes
     bpRegions[1:length(repeats)] = repeats
+    rm(repeats)
   }
 
   ## put SVs anywhere in the genome if no regions were specified

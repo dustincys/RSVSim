@@ -189,13 +189,13 @@ metadata(sim)
 ## Setting the weights for SV formation mechanism and repeat biases demands a given data.frame structure
 ## The following weights are the default settings
 ## Please make sure your data.frames have the same row and column names, when setting your own weights
-data(weightsMechanism)
-weightsMechanism
-data(weightsRepeat)
-weightsRepeat
+data(weightsMechanisms, package="RSVSim")
+weightsMechanisms
+data(weightsRepeats, package="RSVSim")
+weightsRepeats
 ## The weights take effect, when no genome argument has been specified (i.e. the default genome hg19 will be used) and the argument repeatBias has been set to TRUE
-\dontrun{sim = simulateSV(output=NA, dels=10, invs=10, ins=10, dups=10, trans=10, repeatBias = TRUE, weightsMechanisms=weightsMechanism, weightsRepeats=weightsRepeat)}
-## If weightsMechanisms and weightsRepeats were omitted, RSVSim loads the default weights automatically
+\dontrun{sim = simulateSV(output=NA, dels=10, invs=10, ins=10, dups=10, trans=10, repeatBias = TRUE, weightsMechanisms=weightsMechanisms, weightsRepeats=weightsRepeats)}
+## If weightsMechanisms and weightsRepeats were omitted, RSVSim loads the default weights automatically (see details section above for more info)
 \dontrun{sim = simulateSV(output=NA, dels=10, invs=10, ins=10, dups=10, trans=10, repeatBias = TRUE)}
 
 }

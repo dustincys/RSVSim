@@ -374,7 +374,7 @@ setMethod("compareSV",
   sinesMIR = repeats[repeats$type == "MIR"]
   ## load previously saved segmental duplications to avoid import from UCSC browser
   if(file.exists(file.path(path.package("RSVSim"), "data", "segmentalDuplications.RData"))){
-    data("segmentalDuplications")
+    data("segmentalDuplications", package="RSVSim", envir=environment())
   }else{
     require(rtracklayer)
     segDups = .loadFromUCSC_SegDups()
@@ -382,7 +382,7 @@ setMethod("compareSV",
   trs = .loadFromBSGenome_TandemRepeats()
   repeats = list(linesL1, linesL2, sinesAlu, sinesMIR, segDups, trs)
   if(save == TRUE){
-    save(repeats, file=file.path(path.package("RSVSim"), "data", "repeats_hg19.RData"), compression_level=9, compress="bzip2")
+    save(repeats, file=file.path(path.package("RSVSim"), "data", "repeats_hg19.RData"), compress="xz")
    }
   return(repeats)
 }
@@ -420,14 +420,14 @@ setMethod("compareSV",
   sinesMIR = repeats[repeats$type == "MIR"]  
   ## load previously saved segmental duplications to avoid import from UCSC browser
   if(file.exists(file.path(path.package("RSVSim"), "data", "segmentalDuplications.RData"))){
-    data("segmentalDuplications")
+    data("segmentalDuplications", package="RSVSim", envir=environment())
   }else{
     segDups = .loadFromUCSC_SegDups()
   }
   trs = .loadFromBSGenome_TandemRepeats()
   repeats = list(linesL1, linesL2, sinesAlu, sinesMIR, segDups, trs)
   if(save == TRUE){
-    save(repeats, file=file.path(path.package("RSVSim"), "data", "repeats_hg19.RData"), compression_level=9, compress="bzip2")
+    save(repeats, file=file.path(path.package("RSVSim"), "data", "repeats_hg19.RData"), compress="xz")
   }
   return(repeats)
 }
@@ -534,10 +534,10 @@ names(subtrahend) = c("t3","t4")
       ))
     names(genome) = c("chr1","chr2","chr3","chr4","chr5","chr6")
     
-    dels = 10
-    ins = 10
-    invs = 10
-    dups = 10
+    dels = 100
+    ins = 100
+    invs = 100
+    dups = 100
     trans = 5
     sizeDels = sample(1000:5000, dels, replace=TRUE)
     sizeIns = sample(1000:5000, ins, replace=TRUE)

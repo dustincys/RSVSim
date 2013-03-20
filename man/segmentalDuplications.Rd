@@ -14,7 +14,7 @@
 }
 
 \usage{
-  data(segmentalDuplications)
+  data("segmentalDuplications")
 }
 
 \format{
@@ -28,7 +28,7 @@
 }
 
 \examples{
-  data(segmentalDuplications)
+  data("segmentalDuplications")
   segDups
 }
 
