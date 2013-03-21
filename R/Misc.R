@@ -547,13 +547,13 @@ names(subtrahend) = c("t3","t4")
     sim = simulateSV(output=NA, genome=genome, dels=dels, ins=ins, invs=invs, dups=dups, trans=trans, sizeDels=sizeDels, sizeIns=sizeIns, sizeInvs=sizeInvs, sizeDups=sizeDups, maxDups=10, bpSeqSize=bpSeqSize, random=TRUE, repeatBias=FALSE, percSNPs=0, indelProb=0)
 
     ## sim2 is for testing the non-random implementation of predefined sv regions
-    regionsDels = GRanges(IRanges(metadata(sim)$deletions$Start, metadata(sim)$deletions$End), seqnames=metadata(sim)$deletions$Chr)
-    regionsIns = GRanges(IRanges(metadata(sim)$insertions$StartA, metadata(sim)$insertions$EndA), seqnames=metadata(sim)$insertions$ChrA, chrB=metadata(sim)$insertions$ChrB, startB=metadata(sim)$insertions$StartB, endB=metadata(sim)$insertions$EndB)
-    regionsInvs = GRanges(IRanges(metadata(sim)$inversions$Start, metadata(sim)$inversions$End), seqnames=metadata(sim)$inversions$Chr)
-    regionsDups = GRanges(IRanges(metadata(sim)$tandemDuplications$Start, metadata(sim)$tandemDuplications$End), seqnames=metadata(sim)$tandemDuplications$Chr)
-    regionsTrans = GRanges(IRanges(metadata(sim)$translocations$StartA, metadata(sim)$translocations$EndA), seqnames=metadata(sim)$translocations$ChrA, chrB=metadata(sim)$translocations$ChrB, startB=metadata(sim)$translocations$StartB, endB=metadata(sim)$translocations$EndB)
-    sim2 = simulateSV(output=NA, genome=genome, dels=dels, ins=ins, invs=invs, dups=dups, trans=trans, sizeDels=sizeDels, sizeIns=sizeIns, sizeInvs=sizeInvs, sizeDups=sizeDups, regionsDels=regionsDels, regionsIns=regionsIns, regionsInvs=regionsInvs, regionsDups=regionsDups, regionsTrans=regionsTrans, maxDups=10, bpSeqSize=bpSeqSize, random=FALSE, repeatBias=FALSE, percSNPs=0, indelProb=0)
-    sim = sim2
+#    regionsDels = GRanges(IRanges(metadata(sim)$deletions$Start, metadata(sim)$deletions$End), seqnames=metadata(sim)$deletions$Chr)
+#    regionsIns = GRanges(IRanges(metadata(sim)$insertions$StartA, metadata(sim)$insertions$EndA), seqnames=metadata(sim)$insertions$ChrA, chrB=metadata(sim)$insertions$ChrB, startB=metadata(sim)$insertions$StartB, endB=metadata(sim)$insertions$EndB)
+#    regionsInvs = GRanges(IRanges(metadata(sim)$inversions$Start, metadata(sim)$inversions$End), seqnames=metadata(sim)$inversions$Chr)
+#    regionsDups = GRanges(IRanges(metadata(sim)$tandemDuplications$Start, metadata(sim)$tandemDuplications$End), seqnames=metadata(sim)$tandemDuplications$Chr)
+#    regionsTrans = GRanges(IRanges(metadata(sim)$translocations$StartA, metadata(sim)$translocations$EndA), seqnames=metadata(sim)$translocations$ChrA, chrB=metadata(sim)$translocations$ChrB, startB=metadata(sim)$translocations$StartB, endB=metadata(sim)$translocations$EndB)
+#    sim2 = simulateSV(output=NA, genome=genome, dels=dels, ins=ins, invs=invs, dups=dups, trans=trans, sizeDels=sizeDels, sizeIns=sizeIns, sizeInvs=sizeInvs, sizeDups=sizeDups, regionsDels=regionsDels, regionsIns=regionsIns, regionsInvs=regionsInvs, regionsDups=regionsDups, regionsTrans=regionsTrans, maxDups=10, bpSeqSize=bpSeqSize, random=FALSE, repeatBias=FALSE, percSNPs=0, indelProb=0)
+#    sim = sim2
     
     bpSeqSize = bpSeqSize / 2
     maxMismatch = 0

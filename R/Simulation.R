@@ -5,6 +5,7 @@
   bpRegions = NULL
   sampleChr = FALSE
   chrs = seqlevels(bpRegionsList[["Random"]])
+  
   ## a chromosome can be given (for translocations and insertions) or sampled randomly when set to NA (other SVs)
   if(is.na(chr)){
     sampleChr = TRUE
@@ -31,30 +32,33 @@
     bpRegions = bpRegionsList[[regionType]]
     bpRegions = bpRegions[seqnames(bpRegions) == chr]
 
-    ## for NAHR, set the breakpoints within a repeat (plus some tolerance towards the repeat margins)
-    ## make sure the regions do not overlap with valid "normal" regions
-    if(mechanism == "NAHR" & regionType != "Random"){
-      tol = 50
-      bpRegions = bpRegions[width(bpRegions) >= size+(tol*2)]
+    if(regionType != "Random"){
+      
+      ## for NAHR, set the breakpoints within a repeat (plus some tolerance towards the repeat margins)
+      ## make sure the regions do not overlap with valid "normal" regions
+      if(mechanism == "NAHR"){
+        tol = -50
+        bpRegions = bpRegions[width(bpRegions) >= size+(tol*2)]
+      }
+      ## for NHR, TEI and VNTR set at least one of both breakpoints within the repeats
+      ## add some tolerance to the ends of the repeats and make sure the repeat will overlap the SV by at least 75%
+      if(mechanism %in% c("NHR", "TEI", "VNTR")){
+        tol = size*0.25
+        bpRegions = bpRegions[width(bpRegions) >= size*0.75]  # take care, that repeat will make up at least 75% of the SV region
+      }
+      ## for any "other" mechanism just use the regions itself;  select only those which are large enough
+      if(mechanism == "Other"){
+        tol = 0
+        bpRegions = bpRegions[width(bpRegions) >= size]
+      }
+      ## take care, that the region is free and available, i.e. not occupied by another SV
       if(length(bpRegions) > 0){
-        bpRegions = bpRegions - tol # tolerance to make sure, that breakpoints lie not too close to the repeat margins
+        bpRegions = bpRegions + tol
         bpRegions = bpRegions[queryHits(findOverlaps(bpRegions, bpRegionsList[["Random"]], type="within"))]
       }
-    }
-    ## for NHR, TEI and VNTR set one of both breakpoints within the repeats
-    ## but make sure they are large enough by extending the regions at the start or end (randomly)
-    if((length(bpRegions) == 0 | mechanism %in% c("NHR", "TEI", "VNTR")) & regionType != "Random"){
-      tol = 50
-      tooSmall = width(bpRegions) < (size + tol)
-      extendStart = sample(c(TRUE,FALSE), length(bpRegions), replace=TRUE)
-      diff = size - width(bpRegions) + tol # plus some tolerance (50bp)
-      start(bpRegions[tooSmall&extendStart]) = start(bpRegions[tooSmall&extendStart]) - diff[tooSmall&extendStart]
-      end(bpRegions[tooSmall&!extendStart]) = end(bpRegions[tooSmall&!extendStart]) + diff[tooSmall&!extendStart]    
-      bpRegions = bpRegions[queryHits(findOverlaps(bpRegions, bpRegionsList[["Random"]], type="within"))]
-    }
-    ## for any other "normal" mechanism and region just use the regions itself
-    ## select only those which are large enough
-    if(mechanism == "Other" | regionType == "Random"){
+      
+    ## for any normal/random region just use the regions itself; select only those which are large enough
+    }else{
       bpRegions = bpRegions[width(bpRegions) >= size]
     }
     
@@ -64,6 +68,7 @@
         regionType = "Random"
       }
     }
+    
   }
 
   ## abort, if there is no regions large enough for this SV, no matter which mechanism you choose

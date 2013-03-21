@@ -86,7 +86,7 @@ setMethod("simulateSV",
     rownames(weightsMechanisms) = mechanisms
   }  
   if(missing(weightsRepeats) & genomeOrganism == "hg19" & repeatBias){
-    data("weightsRepeats", package="RSVSim", envir=environment())  ##TODO: same as above
+    data("weightsRepeats", package="RSVSim", envir=environment())
   }else{
     weightsRepeats = data.frame(
       NAHR = c(0,0,0,0,0,0,0),
@@ -141,7 +141,7 @@ setMethod("simulateSV",
       }
     }
     repeats = lapply(repeats, function(r) return(r[seqnames(r) %in% chrs]))
-    repeats = lapply(repeats, function(r) return(reduce(r, min.gapwidth=100)))  # merge repeats which are only 100bp away from each other
+    repeats = lapply(repeats, function(r) return(reduce(r, min.gapwidth=50)))  # merge repeats which are only 100bp away from each other
     bpRegions = vector(mode="list", length=length(repeats)+1)
     names(bpRegions) = bpTypes
     bpRegions[1:length(repeats)] = repeats
