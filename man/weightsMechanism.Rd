@@ -24,7 +24,7 @@
 
 \examples{
   data(weightsMechanisms)
-  weightsMechanism
+  weightsMechanisms
 }
 
 \keyword{datasets}
