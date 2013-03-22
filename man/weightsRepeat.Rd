@@ -14,7 +14,7 @@
 }
 
 \usage{
-  data(weightsRepeat)
+  data(weightsRepeats)
 }
 
 \format{
@@ -23,8 +23,8 @@
 
 
 \examples{
-  data(weightsRepeat)
-  weightsRepeat
+  data(weightsRepeats)
+  weightsRepeats
 }
 
 \keyword{datasets}
