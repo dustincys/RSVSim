@@ -14,7 +14,7 @@
 }
 
 \usage{
-  data(weightsMechanism)
+  data(weightsMechanisms)
 }
 
 \format{
@@ -23,7 +23,7 @@
 
 
 \examples{
-  data(weightsMechanism)
+  data(weightsMechanisms)
   weightsMechanism
 }
 
