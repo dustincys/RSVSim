@@ -1,5 +1,5 @@
-\name{weightsMechanism}
-\alias{weightsMechanism}
+\name{weightsMechanisms}
+\alias{weightsMechanisms}
 
 \docType{data}
 
@@ -14,7 +14,7 @@
 }
 
 \usage{
-  data(weightsMechanisms)
+  data("weightsMechanisms")
 }
 
 \format{
@@ -23,7 +23,7 @@
 
 
 \examples{
-  data(weightsMechanisms)
+  data("weightsMechanisms")
   weightsMechanisms
 }
 
