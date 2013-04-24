@@ -472,7 +472,7 @@ setMethod("compareSV",
 
 
 .getHG19 <- function(chrs){
-  
+
   ## use library BSgenome.Hsapiens.UCSC.hg19 as default genome
   require(BSgenome.Hsapiens.UCSC.hg19)
   if(any(is.na(chrs))){
@@ -501,6 +501,7 @@ setMethod("compareSV",
   
 #  diff = setdiff(disjoin(c(subject,subtrahend)), subtrahend)
   diff = setdiff(subject, subtrahend)
+  seqlevels(diff) = unique(as.character(seqnames(diff)))
   return(diff)
   
 }

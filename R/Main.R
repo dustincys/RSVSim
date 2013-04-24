@@ -113,7 +113,7 @@ setMethod("simulateSV",
     if(verbose==TRUE) message("Bias for hg19 repeat regions is turned ON")
     ## 2. repeatMasker regions were loaded and saved to disk once befoe in the data directory of the package
     ## then just load the data
-    if(file.exists(file.path(path.package("RSVSim"), "data", "repeats_hg19.RData"))){
+    if(file.exists(file.path("/home/c_bart07/R/x86_64-pc-linux-gnu-library/3.0/RSVSim", "data", "repeats_hg19.RData"))){
       if(verbose==TRUE) message("Loading hg19 repeat regions")
       data("repeats_hg19", package="RSVSim", envir=environment())  ## loads object named "repeats"
     }else{
@@ -122,10 +122,10 @@ setMethod("simulateSV",
       if(!missing(repeatMaskerFile)){
         if(verbose==TRUE) message("Loading hg19 repeat regions for the first time from given RepeatMasker output file")
         repeats = .readRepeatMaskerOutput(repeatMaskerFile)
-        if(file.exists(file.path(path.package("RSVSim"), "data", "repeats_hg19.RData"))){
-         if(verbose==TRUE)  message("Repeat regions were saved to ", file.path(path.package("RSVSim"), "data", "repeats_hg19.RData"), " for faster access next time")
+        if(file.exists(file.path("/home/c_bart07/R/x86_64-pc-linux-gnu-library/3.0/RSVSim", "data", "repeats_hg19.RData"))){
+         if(verbose==TRUE)  message("Repeat regions were saved to ", file.path("/home/c_bart07/R/x86_64-pc-linux-gnu-library/3.0/RSVSim", "data", "repeats_hg19.RData"), " for faster access next time")
         }else{
-          warning("Saving of repeat regions to ", file.path(path.package("RSVSim"), "data", "repeats_hg19.RData"), " failed")
+          warning("Saving of repeat regions to ", file.path("/home/c_bart07/R/x86_64-pc-linux-gnu-library/3.0/RSVSim", "data", "repeats_hg19.RData"), " failed")
         }
       }
       ## 4. no repeatMasker file is given
@@ -133,10 +133,10 @@ setMethod("simulateSV",
       else{
         if(verbose==TRUE) message("Loading hg19 repeat regions for the first time from the UCSC Browser's RepeatMasker track (this may take up to 45 minutes)")
         repeats = .loadFromUCSC_RepeatMasks(save=TRUE, verbose=verbose)  
-        if(file.exists(file.path(path.package("RSVSim"), "data", "repeats_hg19.RData"))){
-         if(verbose==TRUE)  message("Repeat regions were saved to ", file.path(path.package("RSVSim"), "data", "repeats_hg19.RData"), " for faster access next time")
+        if(file.exists(file.path("/home/c_bart07/R/x86_64-pc-linux-gnu-library/3.0/RSVSim", "data", "repeats_hg19.RData"))){
+         if(verbose==TRUE)  message("Repeat regions were saved to ", file.path("/home/c_bart07/R/x86_64-pc-linux-gnu-library/3.0/RSVSim", "data", "repeats_hg19.RData"), " for faster access next time")
         }else{
-          warning("Saving of repeat regions to ", file.path(path.package("RSVSim"), "data", "repeats_hg19.RData"), " failed")
+          warning("Saving of repeat regions to ", file.path("/home/c_bart07/R/x86_64-pc-linux-gnu-library/3.0/RSVSim", "data", "repeats_hg19.RData"), " failed")
         }
       }
     }
@@ -230,7 +230,6 @@ setMethod("simulateSV",
   
   ## bpSeqSize will be used two times, in upstream and downstream direction; so divide it hear by two
   bpSeqSize = round(bpSeqSize / 2)
-  
 
   ## Simulation ############################################################
 

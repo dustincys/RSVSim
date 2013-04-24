@@ -25,6 +25,9 @@
     ## sample chromosome if it is missing; larger chromosomes have a higher probability
     if(sampleChr == TRUE){
       probs = sapply(chrs, function(x){return(sum(width(bpRegionsList[["Random"]][seqnames(bpRegionsList[["Random"]]) == x])))})
+      if(all(probs == 0)){
+        stop("Sorry, not possible to find a spot on the genome which is large enough for SV of size ", size, "bp, given the current parameter settings.")
+      }
       chr = sample(chrs, 1, prob=probs)
       chrs = chrs[chrs != chr]
     }
@@ -38,7 +41,7 @@
       ## make sure the regions do not overlap with valid "normal" regions
       if(mechanism == "NAHR"){
         tol = -50
-        bpRegions = bpRegions[width(bpRegions) >= size+(tol*2)]
+        bpRegions = bpRegions[width(bpRegions) >= size-(tol*2)]
       }
       ## for NHR, TEI and VNTR set at least one of both breakpoints within the repeats
       ## add some tolerance to the ends of the repeats and make sure the repeat will overlap the SV by at least 75%
@@ -73,22 +76,15 @@
 
   ## abort, if there is no regions large enough for this SV, no matter which mechanism you choose
   if(length(bpRegions) == 0){
-    stop("Sorry, not possible to find a spot on the genome, which is large enough for SV of size ", size, "bp")
+    stop("Sorry, not possible to find a spot on the genome, which is large enough for SV of size ", size, "bp, given the current parameter settings.")
   }
     
   ## randomly select a region (larger regions have higher probability)
-  ## for NAHR and NHR, just use the flanking regions which already have the right size
   idx = sample(x=1:length(bpRegions), size=1, prob=width(bpRegions))
-  if(mechanism %in% c("NAHR", "NHR")){
-    start = start(bpRegions[idx])
-    end = end(bpRegions[idx])
-  }
-  ## for any other regions (including TEIs and VNTRs), randomly select start and end within the region (regions are already large enough)
-  if(mechanism %in% c("TEI", "VNTR", "Other")){
-    start = sample(x=start(bpRegions[idx]):(end(bpRegions[idx])-size+1), size=1)
-    end =  start + size -1
-  }
-#  return(data.frame(seqnames=unique(seqnames(bpRegions)), start=start, end=end, mechanism=mechanism, bpRegion=regionType))
+  ## randomly select start and end within the region (regions are already large enough)
+  start = sample(x=start(bpRegions[idx]):(end(bpRegions[idx])-size+1), size=1)
+  end =  start + size -1
+  
   return(data.frame(seqnames=unique(seqnames(bpRegions)), start=start, end=end))
 }
 
@@ -267,10 +263,11 @@
   if(n > 0){
     if(verbose==TRUE) pb = txtProgressBar(min = 0, max = n, style = 3)
     for(i in 1:n){      
- 
+  
       p = .drawPos(NA, bpRegionsList, weightsMechanisms, weightsRepeats, sizes[i])
-      pos = rbind(pos, p)    
+      pos = rbind(pos, p)
       bpRegionsList[["Random"]] = .subtractIntervals(bpRegionsList[["Random"]], GRanges(IRanges(p$start, p$end), seqnames=p$seqnames))
+
       if(verbose==TRUE) setTxtProgressBar(pb, i)
     }
     
