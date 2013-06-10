@@ -41,18 +41,18 @@
       ## make sure the regions do not overlap with valid "normal" regions
       if(mechanism == "NAHR"){
         tol = -50
-        bpRegions = bpRegions[width(bpRegions) >= size-(tol*2)]
+        bpRegions = bpRegions[width(bpRegions) > size-(tol*2)]
       }
       ## for NHR, TEI and VNTR set at least one of both breakpoints within the repeats
       ## add some tolerance to the ends of the repeats and make sure the repeat will overlap the SV by at least 75%
       if(mechanism %in% c("NHR", "TEI", "VNTR")){
         tol = size*0.25
-        bpRegions = bpRegions[width(bpRegions) >= size*0.75]  # take care, that repeat will make up at least 75% of the SV region
+        bpRegions = bpRegions[width(bpRegions) > size*0.75]  # take care, that repeat will make up at least 75% of the SV region
       }
       ## for any "other" mechanism just use the regions itself;  select only those which are large enough
       if(mechanism == "Other"){
         tol = 0
-        bpRegions = bpRegions[width(bpRegions) >= size]
+        bpRegions = bpRegions[width(bpRegions) > size]
       }
       ## take care, that the region is free and available, i.e. not occupied by another SV
       if(length(bpRegions) > 0){

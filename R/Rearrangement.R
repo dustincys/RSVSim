@@ -68,7 +68,7 @@
 }
 
 .execInsertion <- function(genomeSeqA, genomeSeqB, c1, c2, posDel, posIns_1, posIns_2, posInv, posDup, posTrans_1, posTrans_2, i, bpSeqSize, bpFlankSize, percSNPs, indelProb, maxIndelSize){
-  
+
   ## chrA
   pos = posIns_1[i, ]
   startA = as.integer(pos$start)
@@ -131,14 +131,14 @@
     
   ## adjust coordinates downstream of insertion
   adjustBy = adjustBy + endA-startA+1
-  posDel = .adjustPositions(posDel, c2, endB, adjustBy)
-  posIns_1 = .adjustPositions(posIns_1, c2, endB, adjustBy)
-  posIns_2 = .adjustPositions(posIns_2, c2, endB, adjustBy)
-  posInv = .adjustPositions(posInv, c2, endB, adjustBy)
-  posDup = .adjustPositions(posDup, c2, endB, adjustBy)
-  posTrans_1 = .adjustPositions(posTrans_1, c2, endB, adjustBy)
-  posTrans_2 = .adjustPositions(posTrans_2, c2, endB, adjustBy)
-
+  posDel = .adjustPositions(posDel, c2, startB, adjustBy)
+  posIns_1 = .adjustPositions(posIns_1, c2, startB, adjustBy)
+  posIns_2 = .adjustPositions(posIns_2, c2, startB, adjustBy)
+  posInv = .adjustPositions(posInv, c2, startB, adjustBy)
+  posDup = .adjustPositions(posDup, c2, startB, adjustBy)
+  posTrans_1 = .adjustPositions(posTrans_1, c2, startB, adjustBy)
+  posTrans_2 = .adjustPositions(posTrans_2, c2, startB, adjustBy)
+  
   return(list(genomeSeqA, genomeSeqB, posDel, posIns_1, posIns_2, posInv, posDup, posTrans_1, posTrans_2))
 }
 
