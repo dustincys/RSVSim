@@ -107,7 +107,7 @@ seed=246, verbose=FALSE)
 sim
 metadata(sim)
 @
-Regarding insertion\_3, for example, the 5bp segment \Rcode{AAAAA} has been removed from chr1:4-8 and inserted into chr2:33-37. There are three breakpoint sequences reported for each insertion: the sequence at the deletion on chrA and at the 5' and 3' end of its insertion on chrB. \\
+Regarding insertion\_1, for example, the 5bp segment \Rcode{AAAAA} has been removed from chr1:14-18 and inserted into chr2:19-23. There are three breakpoint sequences reported for each insertion: the sequence at the deletion on chrA and at the 5' and 3' end of its insertion on chrB. \\
 
 Setting the parameter \Rfunarg{percCopiedIns} (range: 0-1, i.e. 0\%-100\%) can change the amount of "copy-and-paste-like" insertions. \\
 The same example as before, with the difference that two of the three inserted sequences are copied: 
@@ -117,7 +117,7 @@ bpSeqSize=6, seed=246, verbose=FALSE)
 sim
 metadata(sim)
 @
-The same sequence \Rcode{AAAAA} from insertion\_3 is now duplicated before insertion into chr2:2-6. Here, no breakpoint sequence is reported for the region on chr1, since this chromosome is not altered.
+The same sequence \Rcode{AAAAA} from insertion\_1 is now duplicated before insertion into chr2:19-23. Here, no breakpoint sequence is reported for the region on chr1, since this chromosome is not altered.
 
 \subsection{Inversions}
 A segment is cut from one chromosome and its reverse complement is inserted at the same place without loss or a shift of sequence. The example below assigns a different size for each inversion:
@@ -132,7 +132,7 @@ Inversions have two breakpoint sequences, one for the 5' end and one for the 3' 
 \subsection{Tandem duplications}
 A segment is duplicated one after the other. The number of duplications is determined randomly. The parameter \Rfunarg{maxDups} sets the maximum. The following example generates an, at most, tenfold tandem duplication of a 6bp sequence:
 <<label=tandemDupExample, eval=TRUE>>=
-sim = simulateSV(output=NA, genome=genome, dups=1, sizeDups=6, maxDups=10,
+sim = simulateSV(output=NA, genome=genome, dups=1, sizeDups=6, maxDups=3,
 bpSeqSize=6, seed=3456, verbose=FALSE)
 sim
 metadata(sim)
@@ -204,11 +204,11 @@ SV breakpoints are usually not clean but tend to co-occur with other, usually sm
 The following example creates one deletion with 10\% SNPs and 100\% indel probability within 10bp up-/downstream of the breakpoint:
 <<label=bpMutationsExample, eval=TRUE>>=
 sim = simulateSV(output=NA, genome=genome, dels=1, sizeDels=5, bpFlankSize=10, 
-percSNPs=0.25, indelProb=1, maxIndelSize=3, bpSeqSize=10, seed=1234, verbose=FALSE)
+percSNPs=0.25, indelProb=1, maxIndelSize=3, bpSeqSize=10, seed=123, verbose=FALSE)
 sim
 metadata(sim)
 @
-In addition to the 5bp deletion of the sequence \Rcode{CCCCC}, a SNP \Rcode{C$->$T}, a deletion of one \Rcode{C} and an insertion of \Rcode{ATT} were added up- and downstream of the breakpoint.
+In addition to the 5bp deletion of the sequence \Rcode{CCCCC}, two SNPs \Rcode{C$->$T} and \Rcode{C$->$A}, and a deletion of two more \Rcode{C}s were added up- and downstream of the breakpoint.
 
 \section{Simulation within a genome subset}
 It is possible to run the simulation to certain chromosomes only by specifying the chromosome names in the parameter \Rfunarg{chrs}. It has to be taken care that these chromosome names match the names in the \Robject{DNAStringSet} containing the genome sequences (e.g. "chr1", "chr2", ..., "chrY" for the default genome hg19 from the package \Rpackage{BSgenome.Hsapiens.UCSC.hg19}). \\
@@ -342,7 +342,7 @@ One may specify just one size in the parameters \Rfunarg{sizeDels}, \Rfunarg{siz
 set.seed(246)
 @
 <<label=sizesExample1, eval=TRUE>>=
-sizes = sample(3:10, 5, replace=TRUE)
+sizes = sample(2:5, 5, replace=TRUE)
 sizes
 sim = simulateSV(output=NA, genome=genome, dels=5, sizeDels=sizes,
 bpSeqSize=6, seed=246, verbose=FALSE)

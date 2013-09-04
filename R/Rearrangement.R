@@ -108,7 +108,7 @@
     posTrans_2 = .adjustPositions(posTrans_2, c1, endA, adjustBy)
   }  
   
-  ## insert sequence from chrA intro chrB
+  ## insert sequence from chrA into chrB
   pos = posIns_2[i, ]
   startB = as.integer(pos$start)
   endB = as.integer(pos$end)

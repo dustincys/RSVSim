@@ -4,13 +4,20 @@
 
   bpRegions = NULL
   sampleChr = FALSE
-  chrs = seqlevels(bpRegionsList[["Random"]])
   
-  ## a chromosome can be given (for translocations and insertions) or sampled randomly when set to NA (other SVs)
-  if(is.na(chr)){
+  ## a chromosome can be given as single chromosome or vector (for translocations and insertions) or sampled randomly when set to NA (other SVs)
+  if(any(is.na(chr))){
     sampleChr = TRUE
+    chrs = seqlevels(bpRegionsList[["Random"]])
+  }else{
+    if(length(chr) > 1){
+      sampleChr = TRUE
+      chrs = chr      
+    }else{
+      chrs = seqlevels(bpRegionsList[["Random"]])
+    }
   }
-    
+
   ## sample mechanism
   idx = weightsMechanisms[,1] > 0  # col-index is 1, because main function already passed the right subset of weights
   mechanism = sample(rownames(weightsMechanisms)[idx], 1, prob=weightsMechanisms[idx,1])
@@ -21,7 +28,7 @@
   
   ## while loop in case there no suitable bpregion can be found within any chromosome
   while(length(bpRegions) == 0 & length(chrs) > 0){
-
+    
     ## sample chromosome if it is missing; larger chromosomes have a higher probability
     if(sampleChr == TRUE){
       probs = sapply(chrs, function(x){return(sum(width(bpRegionsList[["Random"]][seqnames(bpRegionsList[["Random"]]) == x])))})
@@ -34,7 +41,7 @@
     
     bpRegions = bpRegionsList[[regionType]]
     bpRegions = bpRegions[seqnames(bpRegions) == chr]
-
+    
     if(regionType != "Random"){
       
       ## for NAHR, set the breakpoints within a repeat (plus some tolerance towards the repeat margins)
@@ -124,10 +131,6 @@
     for(i in 1:n){
       
       ## first translocation partner
-      ## check if regions on two different chromosomes are available
-#      if(length(unique(seqnames(bpRegions))) < 2){
-#        stop("No two chromosomes available for translocations")
-#      }
       ## sample chromosome; larger chromosomes have a higher probability
       chrs = seqlevels(bpRegionsList[["Random"]])
       probs = sapply(chrs, function(x){return(sum(width(bpRegionsList[["Random"]][seqnames(bpRegionsList[["Random"]]) == x])))})
@@ -211,13 +214,9 @@
     for(i in 1:n){
      
       ## first translocation partner
-
-      ## sample chromosome; larger chromosomes have a higher probability
-      chrs = seqlevels(bpRegionsList[["Random"]])
-      probs = sapply(chrs, function(x){return(sum(width(bpRegionsList[["Random"]][seqnames(bpRegionsList[["Random"]]) == x])))})
-      chr1 = as.character(sample(chrs, 1, prob=probs))
-      
-      pos1 = .drawPos(chr1, bpRegionsList, weightsMechanisms, weightsRepeats, sizes[i])
+      chrs = seqlevels(bpRegionsList[["Random"]])      
+      pos1 = .drawPos(chrs, bpRegionsList, weightsMechanisms, weightsRepeats, sizes[i])
+      chr1 = pos1$seqnames
       posIns_1 = rbind(posIns_1, pos1)
       
       ## make sure new SVs do not overlap with this one
@@ -225,10 +224,7 @@
       
       ## second translocation partner
       chrs = chrs[chrs != chr1] # make sure second translocated segments lies on different chromosome
-      probs = sapply(chrs, function(x){return(sum(width(bpRegionsList[["Random"]][seqnames(bpRegionsList[["Random"]]) == x])))})
-      chr2 = as.character(sample(chrs, 1, prob=probs))
-      
-      pos2 = .drawPos(chr2, bpRegionsList, weightsMechanisms, weightsRepeats, sizes[i])
+      pos2 = .drawPos(chrs, bpRegionsList, weightsMechanisms, weightsRepeats, sizes[i])
       posIns_2 = rbind(posIns_2, pos2)
       
       ## make sure new SVs do not overlap with this one

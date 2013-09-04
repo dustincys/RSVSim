@@ -166,8 +166,8 @@ setMethod("compareSV",
   }
   ## deletions, inversions (no bpSeq)
   if(ncol(querySVs) == 3){
-    querySVs_Bp1 = GRanges(IRanges(querySVs[, 2], querySVs[, 2]), seqnames = querySVs[, 1], bpSeq=NA, id=1:nrow(querySVs))
-    querySVs_Bp2 = GRanges(IRanges(querySVs[, 3], querySVs[, 3]), seqnames = querySVs[, 1], bpSeq=NA, id=1:nrow(querySVs))
+    querySVs_Bp1 = GRanges(IRanges(querySVs[, 2], querySVs[, 2]), seqnames = querySVs[, 1], bpSeq=NA, bpSeq1=NA, bpSeq2=NA, id=1:nrow(querySVs))
+    querySVs_Bp2 = GRanges(IRanges(querySVs[, 3], querySVs[, 3]), seqnames = querySVs[, 1], bpSeq=NA, bpSeq1=NA, bpSeq2=NA, id=1:nrow(querySVs))
   }
   if(all(is.null(querySVs_Bp1), is.null(querySVs_Bp2))){
     stop("Invalid SV file: Please make sure, that the SV file is in BED (chr,start,end) or BEDPE format (chr1,start1,end1,chr2,start2,end2) and contains only the breakpoint sequence(s) as additional column")
@@ -204,7 +204,7 @@ setMethod("compareSV",
       chr = as.character(simSV$Chr)
       simSV_Bp1 = GRanges(IRanges(simSV$Start, simSV$Start), seqnames=chr)
       simSV_Bp2 = GRanges(IRanges(simSV$End, simSV$End), seqnames=chr)
-      overlap = .getOverlap(list(simSV_Bp1, simSV_Bp2), list(querySVs_Bp1[seqnames(querySVs_Bp1) == chr], querySVs_Bp2[seqnames(querySVs_Bp2) == chr]), list(simSV$BpSeq_5prime, querySVs_Bp1[seqnames(querySVs_Bp1) == chr]$bpSeq), list(simSV$BpSeq_3prime, querySVs_Bp1[seqnames(querySVs_Bp1) == chr]$bpSeq2), tol, type)
+      overlap = .getOverlap(list(simSV_Bp1, simSV_Bp2), list(querySVs_Bp1[seqnames(querySVs_Bp1) == chr], querySVs_Bp2[seqnames(querySVs_Bp2) == chr]), list(simSV$BpSeq_5prime, querySVs_Bp1[seqnames(querySVs_Bp1) == chr]$bpSeq1), list(simSV$BpSeq_3prime, querySVs_Bp1[seqnames(querySVs_Bp1) == chr]$bpSeq2), tol, type)
       if(!is.null(overlap)){
         simSVs$Overlap[v] = overlap[[1]]
         simSVs$OverlapBpSeq_5prime[v] = overlap[[2]]
@@ -291,9 +291,16 @@ setMethod("compareSV",
   }
 
   ## report sensitivity and precision
-  tp = numOverlaps
-  fp = nrow(querySVs) - tp
-  fn = sum(simSVs$Overlap == "")
+  if(type == "insertion"){
+    tp = numOverlaps
+    fp = nrow(querySVs) - tp
+    fn = sum(simSVs$Overlap_5prime == "") + sum(simSVs$Overlap_3prime == "")
+  }
+  else{
+    tp = numOverlaps
+    fp = nrow(querySVs) - tp
+    fn = sum(simSVs$Overlap == "")
+  }
   sensitivity = round((tp / (tp + fn)) * 100)
   precision = round((tp / (tp + fp)) * 100)
   message("Sensitivity: ", sensitivity, "%")
@@ -324,9 +331,9 @@ setMethod("compareSV",
     ## deletions, inversions and tandem duplications have only start and end, so return just one overlapping region
     ## returned regions include the given tolerance
     if(type == "insertion" | type == "translocation"){
-      overlap = paste(paste(seqnames(query[[1]])[hit1], ":", start(query[[1]])[hit1], "-", end(query[[1]])[hit1], ", ", seqnames(query[[2]])[hit2], ":", start(query[[2]])[hit2], "-", end(query[[2]])[hit2], sep=""), collapse=", ")
+      overlap = paste(paste(seqnames(query[[1]])[hit1], ":", start(query[[1]])[hit1]+tol, "-", end(query[[1]])[hit1]-tol, ", ", seqnames(query[[2]])[hit2], ":", start(query[[2]])[hit2]+tol, "-", end(query[[2]])[hit2]-tol, sep=""), collapse=", ")
     }else{
-      overlap = paste(paste(seqnames(query[[1]])[hit1], ":", start(query[[1]])[hit1], "-", end(query[[2]])[hit1], sep=""), collapse=", ")
+      overlap = paste(paste(seqnames(query[[1]])[hit1], ":", start(query[[1]])[hit1]+tol, "-", end(query[[2]])[hit1]-tol, sep=""), collapse=", ")
     }
     numOverlaps = length(hit1)
     bpSeqAlnScoreA = bpSeqAlnScoreB = NA
@@ -548,13 +555,13 @@ names(subtrahend) = c("t3","t4")
     sim = simulateSV(output=NA, genome=genome, dels=dels, ins=ins, invs=invs, dups=dups, trans=trans, sizeDels=sizeDels, sizeIns=sizeIns, sizeInvs=sizeInvs, sizeDups=sizeDups, maxDups=10, bpSeqSize=bpSeqSize, random=TRUE, repeatBias=FALSE, percSNPs=0, indelProb=0)
 
     ## sim2 is for testing the non-random implementation of predefined sv regions
-#    regionsDels = GRanges(IRanges(metadata(sim)$deletions$Start, metadata(sim)$deletions$End), seqnames=metadata(sim)$deletions$Chr)
-#    regionsIns = GRanges(IRanges(metadata(sim)$insertions$StartA, metadata(sim)$insertions$EndA), seqnames=metadata(sim)$insertions$ChrA, chrB=metadata(sim)$insertions$ChrB, startB=metadata(sim)$insertions$StartB, endB=metadata(sim)$insertions$EndB)
-#    regionsInvs = GRanges(IRanges(metadata(sim)$inversions$Start, metadata(sim)$inversions$End), seqnames=metadata(sim)$inversions$Chr)
-#    regionsDups = GRanges(IRanges(metadata(sim)$tandemDuplications$Start, metadata(sim)$tandemDuplications$End), seqnames=metadata(sim)$tandemDuplications$Chr)
-#    regionsTrans = GRanges(IRanges(metadata(sim)$translocations$StartA, metadata(sim)$translocations$EndA), seqnames=metadata(sim)$translocations$ChrA, chrB=metadata(sim)$translocations$ChrB, startB=metadata(sim)$translocations$StartB, endB=metadata(sim)$translocations$EndB)
-#    sim2 = simulateSV(output=NA, genome=genome, dels=dels, ins=ins, invs=invs, dups=dups, trans=trans, sizeDels=sizeDels, sizeIns=sizeIns, sizeInvs=sizeInvs, sizeDups=sizeDups, regionsDels=regionsDels, regionsIns=regionsIns, regionsInvs=regionsInvs, regionsDups=regionsDups, regionsTrans=regionsTrans, maxDups=10, bpSeqSize=bpSeqSize, random=FALSE, repeatBias=FALSE, percSNPs=0, indelProb=0)
-#    sim = sim2
+    regionsDels = GRanges(IRanges(metadata(sim)$deletions$Start, metadata(sim)$deletions$End), seqnames=metadata(sim)$deletions$Chr)
+    regionsIns = GRanges(IRanges(metadata(sim)$insertions$StartA, metadata(sim)$insertions$EndA), seqnames=metadata(sim)$insertions$ChrA, chrB=metadata(sim)$insertions$ChrB, startB=metadata(sim)$insertions$StartB, endB=metadata(sim)$insertions$EndB)
+    regionsInvs = GRanges(IRanges(metadata(sim)$inversions$Start, metadata(sim)$inversions$End), seqnames=metadata(sim)$inversions$Chr)
+    regionsDups = GRanges(IRanges(metadata(sim)$tandemDuplications$Start, metadata(sim)$tandemDuplications$End), seqnames=metadata(sim)$tandemDuplications$Chr)
+    regionsTrans = GRanges(IRanges(metadata(sim)$translocations$StartA, metadata(sim)$translocations$EndA), seqnames=metadata(sim)$translocations$ChrA, chrB=metadata(sim)$translocations$ChrB, startB=metadata(sim)$translocations$StartB, endB=metadata(sim)$translocations$EndB)
+    sim2 = simulateSV(output=NA, genome=genome, dels=dels, ins=ins, invs=invs, dups=dups, trans=trans, sizeDels=sizeDels, sizeIns=sizeIns, sizeInvs=sizeInvs, sizeDups=sizeDups, regionsDels=regionsDels, regionsIns=regionsIns, regionsInvs=regionsInvs, regionsDups=regionsDups, regionsTrans=regionsTrans, maxDups=10, bpSeqSize=bpSeqSize, random=FALSE, repeatBias=FALSE, percSNPs=0, indelProb=0)
+    sim = sim2
     
     bpSeqSize = bpSeqSize / 2
     maxMismatch = 0
