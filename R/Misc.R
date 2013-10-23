@@ -323,6 +323,7 @@ setMethod("compareSV",
   overlap1 = as.matrix(findOverlaps(sim[[1]], query[[1]]))
   overlap2 = as.matrix(findOverlaps(sim[[2]], query[[2]]))
   if(nrow(overlap1) > 0 & nrow(overlap2) > 0){
+    
     hit1 = overlap1[, "subjectHits"]
     hit2 = overlap2[, "subjectHits"]
 
@@ -333,12 +334,10 @@ setMethod("compareSV",
     if(type == "insertion" | type == "translocation"){
       overlap = paste(paste(seqnames(query[[1]])[hit1], ":", start(query[[1]])[hit1]+tol, "-", end(query[[1]])[hit1]-tol, ", ", seqnames(query[[2]])[hit2], ":", start(query[[2]])[hit2]+tol, "-", end(query[[2]])[hit2]-tol, sep=""), collapse=", ")
     }else{
-      overlap = paste(paste(seqnames(query[[1]])[hit1], ":", start(query[[1]])[hit1]+tol, "-", end(query[[2]])[hit1]-tol, sep=""), collapse=", ")
+      overlap = paste(paste(seqnames(query[[1]])[hit1], ":", start(query[[1]])[hit1]+tol, "-", end(query[[2]])[hit2]-tol, sep=""), collapse=", ")
     }
     numOverlaps = length(hit1)
     bpSeqAlnScoreA = bpSeqAlnScoreB = NA
-#      bpSeqAlnA = pairwiseAlignment(bpSeqA[[1]], bpSeqA[[2]][hit1], type="local", substitutionMatrix=substitutionMatrix, gapOpening=0, gapExtension=0)
-#      bpSeqAlnScoreA = round((score(bpSeqAlnA) / nchar(bpSeqA[[1]])) * 100)  
     if(!any(is.na(bpSeqA[[2]]))){
       ## align all overlaps and report the one with the maximum overlap
       bpSeqAlnScoreA = vector()
@@ -349,8 +348,6 @@ setMethod("compareSV",
       bpSeqAlnScoreA = round((bpSeqAlnScoreA / nchar(bpSeqA[[1]])) * 100)
     }
     if(!any(is.na(bpSeqB[[2]]))){
-#        bpSeqAlnB = pairwiseAlignment(bpSeqB[[1]], bpSeqB[[2]][hit2], type="local", substitutionMatrix=substitutionMatrix, gapOpening=0, gapExtension=0)
-#        bpSeqAlnScoreB = round((score(bpSeqAlnB) / nchar(bpSeqB[[1]])) * 100)
       bpSeqAlnScoreB = vector()
       for(h in hit2){
         bpSeqAlnScoreB = c(bpSeqAlnScoreB, pairwiseAlignment(bpSeqB[[1]], bpSeqB[[2]][h], type="local", substitutionMatrix=substitutionMatrix, gapOpening=0, gapExtension=0, scoreOnly=TRUE))
@@ -359,7 +356,6 @@ setMethod("compareSV",
       bpSeqAlnScoreB = round((bpSeqAlnScoreB / nchar(bpSeqB[[1]])) * 100)
     }
     return (list(overlap, bpSeqAlnScoreA, bpSeqAlnScoreB, numOverlaps))
-#    }
   }
   return (NULL)
 

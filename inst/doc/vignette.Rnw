@@ -293,11 +293,11 @@ simSVs
 An SV detection in BED format (the \Rfunarg{querySVs}) may look like this: Four of five deletions were detected, two with exact and two with an approximate breakpoint. Two additional deletions were detected, which were not part of the simulation. 
 <<label=comparisonExample2, eval=TRUE>>=
 querySVs = data.frame(
-  chr=c("chr1","chr1","chr1","chr2","chr2","chr2"), 
-  start=c(26,12,34,28,16,5), 
-  end=c(30,18,38,32,20,9), 
-  bpSeq=c("TTTTTTTTTT", "AAAAAAATTT", "TTTTTTTTTT", 
-    "CCCCCCCCCC", "GGGGGGGCCC", "GGGGGGGGGG")
+  chr=c("chr1","chr1","chr1","chr2","chr2"),
+  start=c(12,17,32,2,16), 
+  end=c(15,24,36,6,20), 
+  bpSeq=c("AAAAAAAAAA", "AAAAAAATTT", "TTTTTTTTTT", 
+    "GGGGGGGGGG", "GGGGGGCCCC")
 )
 querySVs
 @
