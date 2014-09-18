@@ -106,6 +106,11 @@
     posDup = .adjustPositions(posDup, c1, endA, adjustBy)
     posTrans_1 = .adjustPositions(posTrans_1, c1, endA, adjustBy)
     posTrans_2 = .adjustPositions(posTrans_2, c1, endA, adjustBy)
+    ## update genome if insertion happens on the same chromosome
+    if(c1 == c2){
+     genomeSeqB = genomeSeqA
+    }
+
   }  
   
   ## insert sequence from chrA into chrB
@@ -138,7 +143,11 @@
   posDup = .adjustPositions(posDup, c2, startB, adjustBy)
   posTrans_1 = .adjustPositions(posTrans_1, c2, startB, adjustBy)
   posTrans_2 = .adjustPositions(posTrans_2, c2, startB, adjustBy)
-  
+  ## update genome if insertion happens on the same chromosome
+  if(c1 == c2){
+    genomeSeqA = genomeSeqB
+  }
+
   return(list(genomeSeqA, genomeSeqB, posDel, posIns_1, posIns_2, posInv, posDup, posTrans_1, posTrans_2))
 }
 

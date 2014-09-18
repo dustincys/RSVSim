@@ -43,7 +43,9 @@ setMethod("simulateSV",
     }
     if(missing(chrs)){
       chrs = names(genome)
-    }
+    }else{
+		genome = genome[match(chrs, names(genome))]
+	}
     ## compute gaps within the given genome (N-sequences)
     gaps = GRanges()
     for(chr in chrs){

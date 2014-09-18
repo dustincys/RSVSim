@@ -178,6 +178,11 @@
 
     }
     
+    pos = rbind(posTrans_1, posTrans_2)
+    save(pos, file=paste("~/translocations_repeatInfo.RData", sep=""))
+    posTrans_1 = posTrans_1[,1:3]
+    posTrans_2 = posTrans_2[,1:3]
+    
     if(verbose==TRUE) close(pb)
     
     ## randomly select translocations to be balanced
@@ -212,7 +217,6 @@
   if(n > 0){
     if(verbose==TRUE) pb = txtProgressBar(min = 0, max = n, style = 3)
     for(i in 1:n){
-     
       ## first translocation partner
       chrs = seqlevels(bpRegionsList[["Random"]])      
       pos1 = .drawPos(chrs, bpRegionsList, weightsMechanisms, weightsRepeats, sizes[i])
@@ -223,7 +227,7 @@
       bpRegionsList[["Random"]] = .subtractIntervals(bpRegionsList[["Random"]], GRanges(IRanges(pos1$start, pos1$end), seqnames=pos1$seqnames))
       
       ## second translocation partner
-      chrs = chrs[chrs != chr1] # make sure second translocated segments lies on different chromosome
+      ##chrs = chrs[chrs != chr1] # make sure second translocated segments lies on different chromosome (deprecated: intra-chromosomal insertions allowed)
       pos2 = .drawPos(chrs, bpRegionsList, weightsMechanisms, weightsRepeats, sizes[i])
       posIns_2 = rbind(posIns_2, pos2)
       
@@ -232,6 +236,10 @@
       
       if(verbose==TRUE) setTxtProgressBar(pb, i)
     }
+    pos = rbind(posIns_1, posIns_2)
+    save(pos, file=paste("~/insertions_repeatInfo.RData", sep=""))
+    posIns_1 = posIns_1[,1:3]
+    posIns_2 = posIns_2[,1:3]
     
     ## randomly select insertions to be copied
     copiedIns = sample(1:n, round(n*percCopiedIns))  ## indices of copied translocations
@@ -266,7 +274,6 @@
 
       if(verbose==TRUE) setTxtProgressBar(pb, i)
     }
-    
     svs = cbind("", pos, 0)
     colnames(svs) = c("Name", "Chr", "Start","End", "Size")
     svs$Size = sizes
@@ -275,6 +282,9 @@
   }
   
   if(verbose==TRUE) close(pb)
+
+  save(pos, file=paste("~/", type, "_repeatInfo.RData", sep=""))
+  pos = pos[, 1:3]
 
   return(list(svs, pos))
 }

@@ -478,6 +478,9 @@ setMethod("compareSV",
 
   ## use library BSgenome.Hsapiens.UCSC.hg19 as default genome
   require(BSgenome.Hsapiens.UCSC.hg19)
+  require(BSgenome.Hsapiens.UCSC.hg19.masked)
+  Hsapiens_masked = BSgenome.Hsapiens.UCSC.hg19.masked
+
   if(any(is.na(chrs))){
     chrs = names(Hsapiens)[1:24]
   }
@@ -485,7 +488,7 @@ setMethod("compareSV",
   gaps = data.frame()
   for(c in chrs){
     genome = append(genome, DNAStringSet(DNAString(Hsapiens[[c]])))
-    g = as(masks(Hsapiens[[c]])["AGAPS"], "data.frame")
+    g = as(masks(Hsapiens_masked[[c]])["AGAPS"], "data.frame")
     g$seqnames = c
     gaps = rbind(gaps, g)
   }
@@ -495,7 +498,7 @@ setMethod("compareSV",
 }
 
 .getDummyDataframe <- function(){
-  return(data.frame(seqnames=0,start=0,end=0, stringsAsFactors=FALSE)[-1, ])
+  return(data.frame(seqnames=0,start=0,end=0,mechanism="", bpRegion="", stringsAsFactors=FALSE)[-1, ])
 }
 
 ## subtract interval list from other interval list (both GRanges objects)
