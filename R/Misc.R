@@ -453,12 +453,14 @@ setMethod("compareSV",
 }
 
 .loadFromBSGenome_TandemRepeats <- function(){
-  ## this function requires BSgenome.Hsapiens.UCSC.hg19 to be loaded
+  ## this function requires BSgenome.Hsapiens.UCSC.hg19.masked to be loaded
+  require(BSgenome.Hsapiens.UCSC.hg19.masked)
+  Hsapiens_masked = BSgenome.Hsapiens.UCSC.hg19.masked
   chrs = paste("chr", c(1:22,"X","Y"), sep="")
   tr = GRanges()
   seqlevels(tr) = chrs
   for(c in chrs){
-    t = as(masks(Hsapiens[[c]])["TRF"], "data.frame")
+    t = as(masks(Hsapiens_masked[[c]])["TRF"], "data.frame")
     t = GRanges(IRanges(t$start, t$end), seqnames=c)
     seqlevels(t) = chrs
     tr = c(tr, t)

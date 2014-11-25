@@ -75,31 +75,35 @@ setMethod("simulateSV",
 
   ## for simulation on hg19 set the weights for the repeat elements (if not given by the user)
   ## for simulation on any other organism (user specified genome), set the weights to zero except for random simulation (i.e. turn this feature off)
-  if(missing(weightsMechanisms) & genomeOrganism == "hg19" & repeatBias){
-    data("weightsMechanisms", package="RSVSim", envir=environment())
-  }else{
-    weightsMechanisms = data.frame(
-      dels = c(0,0,0,0,1),
-      ins = c(0,0,0,0,1),
-      invs = c(0,0,0,0,1),
-      dups = c(0,0,0,0,1),
-      trans = c(0,0,0,0,1)
-      )
-    rownames(weightsMechanisms) = mechanisms
+  if(missing(weightsMechanisms)){
+	if(genomeOrganism == "hg19" & repeatBias){
+      data("weightsMechanisms", package="RSVSim", envir=environment())
+    }else{
+      weightsMechanisms = data.frame(
+        dels = c(0,0,0,0,1),
+        ins = c(0,0,0,0,1),
+        invs = c(0,0,0,0,1),
+        dups = c(0,0,0,0,1),
+        trans = c(0,0,0,0,1)
+        )
+      rownames(weightsMechanisms) = mechanisms
+    }
   }  
-  if(missing(weightsRepeats) & genomeOrganism == "hg19" & repeatBias){
-    data("weightsRepeats", package="RSVSim", envir=environment())
-  }else{
-    weightsRepeats = data.frame(
-      NAHR = c(0,0,0,0,0,0,0),
-      NHR = c(0,0,0,0,0,0,0),
-      TEI = c(0,0,0,0,0,0,0),
-      VNTR = c(0,0,0,0,0,0,0),
-      Other = c(0,0,0,0,0,0,1)
-      )
-    rownames(weightsRepeats) = bpTypes
+  if(missing(weightsRepeats)){
+    if(genomeOrganism == "hg19" & repeatBias){
+      data("weightsRepeats", package="RSVSim", envir=environment())
+    }else{
+      weightsRepeats = data.frame(
+        NAHR = c(0,0,0,0,0,0,0),
+        NHR = c(0,0,0,0,0,0,0),
+        TEI = c(0,0,0,0,0,0,0),
+        VNTR = c(0,0,0,0,0,0,0),
+        Other = c(0,0,0,0,0,0,1)
+        )
+      rownames(weightsRepeats) = bpTypes
+    }
   }
-  
+
   ## several options to get the repeatmasker regions:
   ## 1. bp shall be placed randomly (no bpWeights)
   ## then, only use all the genomic coordinates without special weighting for repeats

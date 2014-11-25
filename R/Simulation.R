@@ -179,7 +179,6 @@
     }
     
     pos = rbind(posTrans_1, posTrans_2)
-    save(pos, file=paste("~/translocations_repeatInfo.RData", sep=""))
     posTrans_1 = posTrans_1[,1:3]
     posTrans_2 = posTrans_2[,1:3]
     
@@ -237,7 +236,6 @@
       if(verbose==TRUE) setTxtProgressBar(pb, i)
     }
     pos = rbind(posIns_1, posIns_2)
-    save(pos, file=paste("~/insertions_repeatInfo.RData", sep=""))
     posIns_1 = posIns_1[,1:3]
     posIns_2 = posIns_2[,1:3]
     
@@ -283,7 +281,6 @@
   
   if(verbose==TRUE) close(pb)
 
-  save(pos, file=paste("~/", type, "_repeatInfo.RData", sep=""))
   pos = pos[, 1:3]
 
   return(list(svs, pos))
