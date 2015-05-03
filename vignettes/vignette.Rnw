@@ -224,9 +224,9 @@ metadata(sim)
 @
 For translocations, the regions only say where to place the breakpoint, since the translocated region spans the chromosome until the closest of both ends. \\
 
-Some applications may focus on certain parts of the hg19 only, like exons, introns or transcripts. The package \Rpackage{GenomicFeatures} provides functionalities to export such coordinates from the UCSC Genome Browser to R (see for example \Rfunction{makeTranscriptDbFromUCSC}, \Rfunction{exonsBy}, \Rfunction{intronsBy}, \Rfunction{transcriptsBy}). In the following example, 100 deletions would be placed somewhere in the exonic regions on hg19:
+Some applications may focus on certain parts of the hg19 only, like exons, introns or transcripts. The package \Rpackage{GenomicFeatures} provides functionalities to export such coordinates from the UCSC Genome Browser to R (see for example \Rfunction{makeTxDbFromUCSC}, \Rfunction{exonsBy}, \Rfunction{intronsBy}, \Rfunction{transcriptsBy}). In the following example, 100 deletions would be placed somewhere in the exonic regions on hg19:
 <<label=regionsExample2, eval=FALSE>>=
-transcriptDB = makeTranscriptDbFromUCSC(genome = "hg19",tablename = "knownGene")
+transcriptDB = makeTxDbFromUCSC(genome = "hg19",tablename = "knownGene")
 exons = exonsBy(transcriptDB)
 exons = unlist(exons)
 exons = GRanges(IRanges(start=start(exons), end=end(exons)), seqnames=seqnames(exons))
