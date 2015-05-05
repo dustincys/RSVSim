@@ -208,7 +208,7 @@
   s = min(end-start+1, bpSeqSize)
   bpSeq = paste(subseq(genomeSeq, end-s+1, end), subseq(genomeSeq, start, start+s-1), sep="")
   dupSeq = subseq(genomeSeq, start, end)
-  dupSeq = paste(rep(dupSeq, times), collapse="")
+  dupSeq = paste(rep(dupSeq, times + 1), collapse="")
   genomeSeq = DNAString(paste(subseq(genomeSeq, 1, sf-1), flankingRegion1, dupSeq, flankingRegion2, subseq(genomeSeq, ef+1, length(genomeSeq)), sep=""))
   
   adjustBy = adjustBy + (end-start+1)*(times-1) # adjust positions by length of additional sequence

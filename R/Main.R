@@ -165,7 +165,7 @@ setMethod("simulateSV",
       stop("No regions on given chromosomes")
     }
     ## for non-random distribution, set number of deletions to number of given regions
-    if(random[2] == FALSE){
+    if(random[1] == FALSE){
       dels = length(regionsDels)
     }
   }
@@ -190,26 +190,33 @@ setMethod("simulateSV",
       stop("No regions on given chromosomes")
     }
     ## for non-random distribution, set number of deletions to number of given regions
-    if(random[2] == FALSE){
+    if(random[3] == FALSE){
       invs = length(regionsInvs)
     }
   }
   if(missing(regionsDups)){
     regionsDups = genomeCoords
+    dupTimes = sample(1:(maxDups-1), dups) + 1
   }else{
     regionsDups = regionsDups[seqnames(regionsDups) %in% intersect(chrs, as.character(seqnames((regionsDups))))]
     if(length(regionsDups) == 0){
       stop("No regions on given chromosomes")
     }
     ## for non-random distribution, set number of deletions to number of given regions
-    if(random[2] == FALSE){
+    dupTimes = sample(1:(maxDups-1), length(regionsDups)) + 1
+    if(random[4] == FALSE){
       dups = length(regionsDups)
+      if(ncol(mcols(regionsDups)) > 0){
+		  if("times" %in% colnames(mcols(regionsDups))){
+			dupTimes = mcols(regionsDups)$times
+		  }
+	  }
     }
   }
   if(missing(regionsTrans)){
     regionsTrans = genomeCoords
   }else{
-    if(random[2] == TRUE){
+    if(random[5] == TRUE){
       regionsTrans = regionsTrans[seqnames(regionsTrans) %in% intersect(chrs, as.character(seqnames((regionsTrans))))]
     }else{
       regionsTrans = regionsTrans[seqnames(regionsTrans) %in% intersect(chrs, as.character(seqnames((regionsTrans)))) & regionsTrans$chrB %in% chrs]
@@ -305,13 +312,12 @@ setMethod("simulateSV",
     posIns_2 = as.data.frame(regionsIns)[, c("chrB","startB")]
     posIns_2$endB = posIns_2$startB + size - 1
     colnames(posIns_2) = c("seqnames","start","end")
-    
     ## Add duplicate information (default:FALSE) if not given
-    if(!("copied" %in% colnames(posIns_1)) | !("copied" %in% colnames(posIns_2))){
+    if(!("copied" %in% colnames(posIns_1))){
       posIns_1$copied = posIns_2$copied = FALSE
     }
  
-    insertions = cbind(posIns_1$names, posIns_1[rownames(posIns_1), c("seqnames","start","end")], posIns_2[rownames(posIns_1), c("seqnames","start","end")], size, posIns_2$copied)
+    insertions = cbind(posIns_1$names, posIns_1[rownames(posIns_1), c("seqnames","start","end")], posIns_2[rownames(posIns_1), c("seqnames","start","end")], size, posIns_1$copied)
     colnames(insertions) = c("Name", "ChrA", "StartA", "EndA", "ChrB", "StartB", "EndB", "Size", "Copied")
   }
 
@@ -473,7 +479,8 @@ setMethod("simulateSV",
     names(tandemDups) = c("Name", "Chr", "Start","End", "Size", "Duplications", "BpSeq")
     if(verbose==TRUE) pb = txtProgressBar(min = 0, max = dups, style = 3)
     for(i in 1:dups){
-      times = sample(2:maxDups,1)  ## how many times the sequence is duplicated
+#      times = sample(2:maxDups,1)  ## how many times the sequence is duplicated
+ 	  times = dupTimes[i]
       chr = as.character(posDup$seqnames[i])
       rearrangement = .execTandemDuplication(genome[[chr]], chr, posDel, posIns_1, posIns_2, posInv, posDup, posTrans_1, posTrans_2, bpSeqSize, times, i, bpFlankSize, percSNPs, indelProb, maxIndelSize)
       genome[[chr]] = rearrangement[[1]]
