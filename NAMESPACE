@@ -1,0 +1,12 @@
+import(ShortRead)
+import(Biostrings)
+import(IRanges)
+import(GenomicRanges)
+
+exportMethods(
+
+simulateSV,
+estimateSVSizes,
+compareSV
+
+)
